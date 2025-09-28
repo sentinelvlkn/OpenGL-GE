@@ -4,7 +4,7 @@
  *  Created on: Sep 28, 2025
  *      Author: volokin
  */
-#include "camera.h"
+#include "include/Camera.h"
 
 Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch) :  Front(glm::vec3(0.0f, 0.0f, -1.0f)), 
 																			MovementSpeed(SPEED), 

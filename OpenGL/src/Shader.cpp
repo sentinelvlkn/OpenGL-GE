@@ -4,7 +4,7 @@
  *  Created on: Sep 27, 2025
  *      Author: volokin
  */
-#include "shader.h"
+#include "include/Shader.h"
 
 Shader::Shader(const char* vertexPath, const char* fragmentPath){
 	
