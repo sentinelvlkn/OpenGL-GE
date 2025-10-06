@@ -6,6 +6,12 @@
  */
 
 #include "include/Model.h"
+#include "include/Mesh.h"
+#include <assimp/material.h>
+#include <assimp/mesh.h>
+#include <assimp/types.h>
+#include <cstring>
+#include <vector>
 
 Model::Model(std::string const& path, bool gamma) : gammaCorrection(gamma) {
 	loadModel(path);
@@ -157,8 +163,47 @@ unsigned int TextureFromFile(const char *path, const std::string &directory, boo
 }
 
 
+void Model::processNode(aiNode* node, const aiScene* scene){
+	//process each mesh located at the given node
+	for(unsigned int i=0; i<node->mNumMeshes; i++){
+		//the node contains the indices to index the object in the scene
+		//the scene contains all the data, while the node keeps it organized
+		aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
+		meshes.push_back(processMesh(mesh, scene));
+	}
+	
+	for(unsigned int i=0; i < node->mNumChildren; i++){
+		processNode(node->mChildren[i], scene);	
+	}
 
+}
 
+std::vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, aiTextureType type, std::string typeName){
+	std::vector<Texture> textures;
+	
+	for(unsigned int i=0; i<mat->GetTextureCount(type); i++){
+		aiString string;
+		mat->GetTexture(type, i, &string);
+		//if a texture had been loaded - skip
+		bool skip = false;
+		for(unsigned int j=0; j<loadedTextures.size(); j++){
+			if(std::strcmp(loadedTextures[j].path.data(), string.C_Str()) == 0){//has a texture with the same filepath been loaded
+				textures.push_back(loadedTextures[j]);
+				skip = true;
+				break;
+			}
+		}
+		if(!skip){
+			Texture texture;
+			texture.ID = TextureFromFile(string.C_Str(), this->directory, false);
+			texture.type = typeName;	
+			texture.path = string.C_Str();
+			textures.push_back(texture);
+			loadedTextures.push_back(texture);
+		}
+	}
+	return textures;	
+}
 
 
 
