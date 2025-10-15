@@ -52,13 +52,13 @@ int main()
 		return -1;
 	}
 
-	stbi_set_flip_vertically_on_load(true);
+	//stbi_set_flip_vertically_on_load(true);
 	
 	glEnable(GL_DEPTH_TEST);
 
 	Shader shader("src/shaders/vertex_shader.vert", "src/shaders/fragment_shader.frag");
 	
-	Model backpackModel("src/models/wooden_cylinder/wooden_cylinder.obj");
+	Model backpackModel("src/models/youngbbyoung_cylinder/youngbbyoung_cylinder.obj");
 		
 	while(!glfwWindowShouldClose(window)){
 		processInput(window);
@@ -75,7 +75,7 @@ int main()
 
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-		model = glm::rotate(model, static_cast<float>(glfwGetTime() * glm::radians(20.0f)), glm::vec3(0.2f, 1.0f, 0.1f));
+		model = glm::rotate(model, static_cast<float>(glfwGetTime() * glm::radians(50.0f) * 2.0f), glm::vec3(0.1f, 1.0f, 0.1f));
 		model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));
 		shader.setMat4("model", model);
 		backpackModel.Draw(shader);
