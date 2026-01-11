@@ -4,7 +4,6 @@
 #include "include/Shader.h"
 #include "include/Camera.h"
 #include "include/Model.h"
-#include "include/skybVertices.h"
 #include "stb_image.h"
 #include "include/FileSystem.h"
 #include "glm/glm.hpp"
@@ -17,6 +16,7 @@
 #include <glm/trigonometric.hpp>
 #include <iostream>
 #include <filesystem>
+#include "include/test_vertices.h"
 
 int WIDTH = 800;
 int HEIGHT = 600;
@@ -44,6 +44,10 @@ int main()
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	//glfwWindowHint(GLFW_SAMPLES, 4);
+	
+	//glEnable(GL_MULTISAMPLE);
+	//glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
 	
 	//window create
 	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "OPENGL", NULL, NULL);
@@ -71,11 +75,14 @@ int main()
 	stbi_set_flip_vertically_on_load(true);
 	
 	glEnable(GL_DEPTH_TEST);
-
+	glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	
 	Shader shader("src/shaders/vertex_shader.vert", "src/shaders/fragment_shader.frag");
 	Shader skybShader ("src/shaders/skyb_vertex_shader.vert", "src/shaders/skyb_fragment_shader.frag");
 	Model backpackModel("src/models/backpack/backpack.obj");
-		
+	
+	//skybox
 	unsigned int skyboxVAO, skyboxVBO;
 	glGenVertexArrays(1, &skyboxVAO);
 	glGenBuffers(1, &skyboxVBO);
@@ -87,7 +94,38 @@ int main()
 	
 	//unsigned int cubeTexture = loadTexture("const char *path")
 	
+	//transparent VAO
+	unsigned int transparentVAO, transparentVBO;
+	glGenVertexArrays(1, &transparentVAO);
+	glGenBuffers(1, &transparentVBO);
+	glBindVertexArray(transparentVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, transparentVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(transparentVertices), transparentVertices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)0);
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)(3*sizeof(float)));
+	glBindVertexArray(0);
 	
+	stbi_set_flip_vertically_on_load(false);
+	unsigned int transparentTexture = loadTexture("src/models/transparent_tex/blending_transparent_window.png"); 
+	std::vector<glm::vec3> windows {
+        glm::vec3(1.0f, 0.0f, 1.0f),
+        glm::vec3( 1.5f, 0.0f, 0.51f),
+        glm::vec3( 0.0f, 0.0f, 0.7f),
+        glm::vec3(-0.3f, 0.0f, -2.3f),
+        glm::vec3 (0.5f, 0.0f, -0.6f)
+    };
+	
+	unsigned int grassTexture = loadTexture("src/models/vegetation/grass.png");
+	std::vector<glm::vec3> grass_loc {
+        glm::vec3(3.0f, 0.0f, 1.0f),
+        glm::vec3( 4.5f, 0.0f, 0.51f),
+        glm::vec3( 2.0f, 0.0f, 0.7f),
+        glm::vec3(-2.3f, 0.0f, -2.3f),
+        glm::vec3 (7.5f, 0.0f, -0.6f)
+    };
+
 	skybShader.use();
     skybShader.setInt("skybox", 0);
 	
@@ -98,6 +136,13 @@ int main()
 		
 		processInput(window);
 		
+		std::map<float, glm::vec3> sorted;
+        for (unsigned int i = 0; i < windows.size(); i++)
+        {
+            float distance = glm::length(camera.Position - windows[i]);
+            sorted[distance] = windows[i];
+        }
+		
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -107,13 +152,15 @@ int main()
 		glm::mat4 view = camera.getViewMatrix();
 		shader.setMat4("projection", projection);
 		shader.setMat4("view", view);
-
+		
+		//model, backpack currently
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
 		model = glm::rotate(model, static_cast<float>(glfwGetTime() * glm::radians(50.0f) * 2.0f), glm::vec3(0.1f, 1.0f, 0.1f));
 		model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));
 		shader.setMat4("model", model);
 		backpackModel.Draw(shader);
+    	
 		
 		glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
         glDepthMask(GL_FALSE);
@@ -128,10 +175,34 @@ int main()
         glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);
-        
+
 		glDepthMask(GL_TRUE);
 		glDepthFunc(GL_LESS); // set depth function back to default
 		
+		shader.use();
+		
+		
+		
+		//windows
+		glBindVertexArray(transparentVAO);
+		glBindTexture(GL_TEXTURE_2D, transparentTexture);
+		for (std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin(); it != sorted.rend(); ++it)
+        {
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, it->second);
+            shader.setMat4("model", model);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
+		
+		//grass
+		glBindTexture(GL_TEXTURE_2D, grassTexture);
+		for(unsigned int i=0; i<grass_loc.size(); i++){
+			model = glm::mat4(1.0f);
+			model = glm::translate(model, grass_loc[i]);
+			shader.setMat4("model", model);
+			glDrawArrays(GL_TRIANGLES, 0, 6);
+		}
+			
 		glfwSwapBuffers(window);
         glfwPollEvents();
 	}
@@ -240,8 +311,7 @@ unsigned int loadCubemap(std::vector<std::string> faces){
 void mouse_callback(GLFWwindow* window, double xposIn, double yposIn){
 	float xpos = static_cast<float>(xposIn);
 	    float ypos = static_cast<float>(yposIn);
-	    if (firstMouse)
-	    {
+	    if (firstMouse){
 	        lastX = xpos;
 	        lastY = ypos;
 	        firstMouse = false;
@@ -257,7 +327,6 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn){
 	
 }
 
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
-{
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
     camera.processMouseScroll(static_cast<float>(yoffset));
 }
