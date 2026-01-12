@@ -1,4 +1,5 @@
 
+#include <cstddef>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "include/Shader.h"
@@ -75,11 +76,12 @@ int main()
 	stbi_set_flip_vertically_on_load(true);
 	
 	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	//glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
 	Shader shader("src/shaders/vertex_shader.vert", "src/shaders/fragment_shader.frag");
 	Shader skybShader ("src/shaders/skyb_vertex_shader.vert", "src/shaders/skyb_fragment_shader.frag");
+	Shader screenShader("src/shaders/fbuffer_vertex_shader.vert", "src/shaders/fbuffer_fragment_shader.frag");
 	Model backpackModel("src/models/backpack/backpack.obj");
 	
 	//skybox
@@ -88,46 +90,90 @@ int main()
 	glGenBuffers(1, &skyboxVBO);
 	glBindVertexArray(skyboxVAO);
 	glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices, GL_STATIC_DRAW);
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)0);
 	
 	//unsigned int cubeTexture = loadTexture("const char *path")
 	
-	//transparent VAO
-	unsigned int transparentVAO, transparentVBO;
-	glGenVertexArrays(1, &transparentVAO);
-	glGenBuffers(1, &transparentVBO);
-	glBindVertexArray(transparentVAO);
-	glBindBuffer(GL_ARRAY_BUFFER, transparentVBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(transparentVertices), transparentVertices, GL_STATIC_DRAW);
+	unsigned int quadVAO, quadVBO;
+	glGenVertexArrays(1, &quadVAO);
+	glGenBuffers(1, &quadVBO);
+	glBindVertexArray(quadVAO);
+	glBindBuffer(GL_ARRAY_BUFFER,quadVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)0);
-	glEnableVertexAttribArray(2);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)(3*sizeof(float)));
-	glBindVertexArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)(2*sizeof(float)));
 	
-	stbi_set_flip_vertically_on_load(false);
-	unsigned int transparentTexture = loadTexture("src/models/transparent_tex/blending_transparent_window.png"); 
-	std::vector<glm::vec3> windows {
-        glm::vec3(1.0f, 0.0f, 1.0f),
-        glm::vec3( 1.5f, 0.0f, 0.51f),
-        glm::vec3( 0.0f, 0.0f, 0.7f),
-        glm::vec3(-0.3f, 0.0f, -2.3f),
-        glm::vec3 (0.5f, 0.0f, -0.6f)
-    };
 	
-	unsigned int grassTexture = loadTexture("src/models/vegetation/grass.png");
-	std::vector<glm::vec3> grass_loc {
-        glm::vec3(3.0f, 0.0f, 1.0f),
-        glm::vec3( 4.5f, 0.0f, 0.51f),
-        glm::vec3( 2.0f, 0.0f, 0.7f),
-        glm::vec3(-2.3f, 0.0f, -2.3f),
-        glm::vec3 (7.5f, 0.0f, -0.6f)
-    };
+//	//transparent VAO
+//	unsigned int transparentVAO, transparentVBO;
+//	glGenVertexArrays(1, &transparentVAO);
+//	glGenBuffers(1, &transparentVBO);
+//	glBindVertexArray(transparentVAO);
+//	glBindBuffer(GL_ARRAY_BUFFER, transparentVBO);
+//	glBufferData(GL_ARRAY_BUFFER, sizeof(transparentVertices), transparentVertices, GL_STATIC_DRAW);
+//	glEnableVertexAttribArray(0);
+//	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)0);
+//	glEnableVertexAttribArray(2);
+//	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)(3*sizeof(float)));
+//	glBindVertexArray(0);
+//	
+//	stbi_set_flip_vertically_on_load(false);
+//	unsigned int transparentTexture = loadTexture("src/models/transparent_tex/blending_transparent_window.png"); 
+//	std::vector<glm::vec3> windows {
+//        glm::vec3(1.0f, 0.0f, 1.0f),
+//        glm::vec3( 1.5f, 0.0f, 0.51f),
+//        glm::vec3( 0.0f, 0.0f, 0.7f),
+//        glm::vec3(-0.3f, 0.0f, -2.3f),
+//        glm::vec3 (0.5f, 0.0f, -0.6f)
+//    };
+	
+//	unsigned int grassTexture = loadTexture("src/models/vegetation/grass.png");
+//	std::vector<glm::vec3> grass_loc {
+//        glm::vec3(3.0f, 0.0f, 1.0f),
+//        glm::vec3( 4.5f, 0.0f, 0.51f),
+//        glm::vec3( 2.0f, 0.0f, 0.7f),
+//        glm::vec3(-2.3f, 0.0f, -2.3f),
+//        glm::vec3 (7.5f, 0.0f, -0.6f)
+//    };
+
+	shader.use();	
 
 	skybShader.use();
     skybShader.setInt("skybox", 0);
+	
+	screenShader.use();
+	screenShader.setInt("screenTexture", 0);
+	
+	//framebuffer
+	unsigned int framebuffer;
+	glGenFramebuffers(1, &framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	
+	//color attachment texture
+	unsigned int textureColorBuffer;
+	glGenTextures(1, &textureColorBuffer);
+	glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, WIDTH, HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorBuffer, 0);
+	
+	//renderbuffer obj
+	unsigned int RBO;
+	glGenRenderbuffers(1, &RBO);
+	glBindRenderbuffer(GL_RENDERBUFFER, RBO);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, WIDTH, HEIGHT);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, RBO);
+	
+	//check if framebuffer if it was crated
+	if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE){
+		std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete! Kaput!!!!" << std::endl;
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	
 	while(!glfwWindowShouldClose(window)){
 		float currentFrame = static_cast<float>(glfwGetTime());
@@ -136,12 +182,15 @@ int main()
 		
 		processInput(window);
 		
-		std::map<float, glm::vec3> sorted;
-        for (unsigned int i = 0; i < windows.size(); i++)
-        {
-            float distance = glm::length(camera.Position - windows[i]);
-            sorted[distance] = windows[i];
-        }
+//		std::map<float, glm::vec3> sorted;
+//        for (unsigned int i = 0; i < windows.size(); i++)
+//        {
+//            float distance = glm::length(camera.Position - windows[i]);
+//            sorted[distance] = windows[i];
+//        }
+		
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+		glEnable(GL_DEPTH_TEST);
 		
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -179,39 +228,51 @@ int main()
 		glDepthMask(GL_TRUE);
 		glDepthFunc(GL_LESS); // set depth function back to default
 		
-		shader.use();
-		
-		
-		
+		//shader.use();		
 		//windows
-		glBindVertexArray(transparentVAO);
-		glBindTexture(GL_TEXTURE_2D, transparentTexture);
-		for (std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin(); it != sorted.rend(); ++it)
-        {
-            model = glm::mat4(1.0f);
-            model = glm::translate(model, it->second);
-            shader.setMat4("model", model);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-        }
+//		glBindVertexArray(transparentVAO);
+//		glBindTexture(GL_TEXTURE_2D, transparentTexture);
+//		for (std::map<float, glm::vec3>::reverse_iterator it = sorted.rbegin(); it != sorted.rend(); ++it)
+//        {
+//            model = glm::mat4(1.0f);
+//            model = glm::translate(model, it->second);
+//            shader.setMat4("model", model);
+//            glDrawArrays(GL_TRIANGLES, 0, 6);
+//        }
 		
-		//grass
-		glBindTexture(GL_TEXTURE_2D, grassTexture);
-		for(unsigned int i=0; i<grass_loc.size(); i++){
-			model = glm::mat4(1.0f);
-			model = glm::translate(model, grass_loc[i]);
-			shader.setMat4("model", model);
-			glDrawArrays(GL_TRIANGLES, 0, 6);
-		}
-			
+//		//grass
+//		glBindTexture(GL_TEXTURE_2D, grassTexture);
+//		for(unsigned int i=0; i<grass_loc.size(); i++){
+//			model = glm::mat4(1.0f);
+//			model = glm::translate(model, grass_loc[i]);
+//			shader.setMat4("model", model);
+//			glDrawArrays(GL_TRIANGLES, 0, 6);
+//		}
+		
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0, 0, WIDTH, HEIGHT);		
+		glDisable(GL_DEPTH_TEST); //disabled so screen-space quad isn't discarded
+		 
+		glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+		
+		screenShader.use();
+		glBindVertexArray(quadVAO);
+		glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
+		glDrawArrays(GL_TRIANGLES, 0, 6);	
+
 		glfwSwapBuffers(window);
         glfwPollEvents();
 	}
 	
 	
 	glDeleteVertexArrays(1, &skyboxVAO);
-    
+	glDeleteVertexArrays(1, &quadVAO);
     glDeleteBuffers(1, &skyboxVBO);
-	
+	glDeleteBuffers(1, &quadVBO);
+	glDeleteRenderbuffers(1, &RBO);
+    glDeleteFramebuffers(1, &framebuffer);
+		
 	glfwTerminate();
     return 0;
 }
