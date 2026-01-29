@@ -7,10 +7,10 @@
 
 #ifndef SRC_INCLUDE_TEST_VERTICES_H_
 #define SRC_INCLUDE_TEST_VERTICES_H_
-#include "FileSystem.h"
+#include "include/FileSystem.h"
 #include <vector>
 #include <string>
-
+ 
 float skyboxVertices[] = {
         // positions          
         -1.0f,  1.0f, -1.0f,
@@ -57,12 +57,12 @@ float skyboxVertices[] = {
     };
 	
 	std::vector<std::string> faces {
-		FileSystem::getPath("src/models/skybox/right.jpg"),
-        FileSystem::getPath("src/models/skybox/left.jpg"),
-        FileSystem::getPath("src/models/skybox/top.jpg"),
-        FileSystem::getPath("src/models/skybox/bottom.jpg"),
-        FileSystem::getPath("src/models/skybox/front.jpg"),
-        FileSystem::getPath("src/models/skybox/back.jpg")
+	    FileSystem::pathFromRoot("src/models/skybox/right.jpg"),
+	    FileSystem::pathFromRoot("src/models/skybox/left.jpg"),
+	    FileSystem::pathFromRoot("src/models/skybox/top.jpg"),
+	    FileSystem::pathFromRoot("src/models/skybox/bottom.jpg"),
+	    FileSystem::pathFromRoot("src/models/skybox/front.jpg"),
+	    FileSystem::pathFromRoot("src/models/skybox/back.jpg")
 	};
 		
 float transparentVertices[] = {

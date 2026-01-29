@@ -9,6 +9,7 @@
 #define SRC_FILESYSTEM_H_
 
 #include <string>
+#include <filesystem>
 
 class FileSystem
 {
@@ -19,6 +20,11 @@ public:
     {
         return path;
     }
+    
+    static std::string pathFromRoot(const std::string &loc) {
+		return (std::filesystem::path(PROJECT_ROOT_DIR) / loc).string();
+    }
 };
+
 
 #endif /* SRC_FILESYSTEM_H_ */

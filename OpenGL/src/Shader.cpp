@@ -5,7 +5,8 @@
  *      Author: volokin
  */
 #include "include/Shader.h"
-#include <unistd.h>
+//#include <unistd.h>
+#include "filesystem"
 
 Shader::Shader(const char* vertexPath, const char* fragmentPath){
 	
@@ -22,8 +23,9 @@ Shader::Shader(const char* vertexPath, const char* fragmentPath){
 	//reading files
 	try {
 		char cwd[1024];
-		getcwd(cwd, sizeof(cwd));
-		std::cout << "Working dir: " << cwd << std::endl;
+		//getcwd(cwd, sizeof(cwd));
+		//std::string cwd = std::filesystem::current_path().string();
+		std::cout << "Working dir: " << std::filesystem::current_path() << std::endl;
 		std::cout << "Trying to read: " << vertexPath << std::endl;
 		vShaderFile.open(vertexPath);
 

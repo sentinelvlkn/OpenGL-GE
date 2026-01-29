@@ -11,14 +11,22 @@ add_executable(${PROJECT_NAME}
     src/Mesh.cpp
     src/Model.cpp
     src/Shader.cpp
-    src/glad.c
+    
     src/stb_image_impl.cpp
-)
+  "src/glad.c")
 
 #includes
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/src/include
     ${CMAKE_SOURCE_DIR}/src
+)
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+    PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}"
+)
+
+set_property(TARGET ${PROJECT_NAME}
+  PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
 )
 
 #OpenGL

@@ -16,7 +16,6 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/trigonometric.hpp>
 #include <iostream>
-#include <filesystem>
 #include "include/test_vertices.h"
 
 int WIDTH = 800;
@@ -38,6 +37,11 @@ bool firstMouse = true;
 
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
+
+//for scene fade in and fade out
+float fade = 0.0f;
+bool fadeIn = true; 
+bool fadeOut = false;
 
 int main()
 {
@@ -72,6 +76,10 @@ int main()
 		return -1;
 	}
 	
+	std::cout << "GLAD load: " << (gladLoadGLLoader((GLADloadproc)glfwGetProcAddress) ? "OK" : "FAIL")<< "\n";
+	std::cout << "GL_VERSION: " << glGetString(GL_VERSION) << "\n";
+
+
 	unsigned int cubemapTexture = loadCubemap(faces);
 	stbi_set_flip_vertically_on_load(true);
 	
@@ -79,10 +87,27 @@ int main()
 	//glEnable(GL_BLEND);
     //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	
-	Shader shader("src/shaders/vertex_shader.vert", "src/shaders/fragment_shader.frag");
-	Shader skybShader ("src/shaders/skyb_vertex_shader.vert", "src/shaders/skyb_fragment_shader.frag");
-	Shader screenShader("src/shaders/fbuffer_vertex_shader.vert", "src/shaders/fbuffer_fragment_shader.frag");
-	Model backpackModel("src/models/backpack/backpack.obj");
+	Shader shader( 
+		FileSystem::pathFromRoot("src/shaders/vertex_shader.vert").c_str(),
+		FileSystem::pathFromRoot("src/shaders/fragment_shader.frag").c_str()
+	);
+
+	Shader skybShader( 
+		FileSystem::pathFromRoot("src/shaders/skyb_vertex_shader.vert").c_str(), 
+		FileSystem::pathFromRoot("src/shaders/skyb_fragment_shader.frag")
+			.c_str()
+	);
+
+	Shader screenShader(
+		FileSystem::pathFromRoot("src/shaders/fbuffer_vertex_shader.vert")
+			.c_str(),
+		FileSystem::pathFromRoot("src/shaders/fbuffer_fragment_shader.frag")
+			.c_str()
+	);
+
+	Model backpackModel(
+		FileSystem::pathFromRoot("src/models/backpack/backpack.obj").c_str()
+	);
 	
 	//skybox
 	unsigned int skyboxVAO, skyboxVBO;
@@ -175,11 +200,29 @@ int main()
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	
+	lastFrame = static_cast<float>(glfwGetTime());
+
 	while(!glfwWindowShouldClose(window)){
 		float currentFrame = static_cast<float>(glfwGetTime());
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
 		
+		if (fadeIn) {
+			fade += deltaTime;
+			if (fade >= 1.0f) {
+				fade = 1.0f;
+				fadeIn = false;
+			}
+		} else if (fadeOut) {
+			fade -= deltaTime;
+			if (fade <= 0.0f) {
+				fade = 0.0f;
+				fadeOut = false;
+			}
+		}
+		fade = glm::clamp(fade, 0.0f, 1.0f);
+
+
 		processInput(window);
 		
 //		std::map<float, glm::vec3> sorted;
@@ -189,6 +232,8 @@ int main()
 //            sorted[distance] = windows[i];
 //        }
 		
+
+
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 		glEnable(GL_DEPTH_TEST);
 		
@@ -257,6 +302,8 @@ int main()
 		glClear(GL_COLOR_BUFFER_BIT);
 		
 		screenShader.use();
+		screenShader.setFloat("fade", fade);
+
 		glBindVertexArray(quadVAO);
 		glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
 		glDrawArrays(GL_TRIANGLES, 0, 6);	
@@ -287,21 +334,30 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height){
 }
 
 void processInput(GLFWwindow* window){
-if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-	glfwSetWindowShouldClose(window, true);
+	if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+		glfwSetWindowShouldClose(window, true);
 
-if(glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-	camera.processKeyboard(FORWARD, deltaTime);
+	if(glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+		camera.processKeyboard(FORWARD, deltaTime);
 
-if(glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-	camera.processKeyboard(BACKWARD, deltaTime);
+	if(glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+		camera.processKeyboard(BACKWARD, deltaTime);
 
-if(glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-	camera.processKeyboard(LEFT, deltaTime);
+	if(glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		camera.processKeyboard(LEFT, deltaTime);
 
-if(glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-	camera.processKeyboard(RIGHT, deltaTime);
-
+	if(glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+		camera.processKeyboard(RIGHT, deltaTime);
+	//fadeIn sets to true
+	if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS) {
+		fade = 0.0f;
+		fadeIn = true;
+	}
+	// fadeOut sets to true	
+	if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS) {
+		fade = 1.0f;
+		fadeOut = true;
+	}
 
 }
 
@@ -312,7 +368,7 @@ unsigned int loadTexture(const char* path){ //load 2D texture from file
 	int width, height, nrComponents;
 	unsigned char* data = stbi_load(path, &width, &height, &nrComponents, 0);
 	if(data){
-		GLenum format;
+		GLenum format = GL_RGB;
 		switch(nrComponents){
 			case 1: format = GL_RED; break;
 			case 3: format = GL_RGB; break;
@@ -391,3 +447,4 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn){
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
     camera.processMouseScroll(static_cast<float>(yoffset));
 }
+

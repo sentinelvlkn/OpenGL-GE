@@ -1,1 +1,21 @@
-/Debug/
+# Visual Studio
+.vs/
+*.sln
+*.vcxproj*
+CMakeSettings.json
+
+# CMake
+out/
+build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+
+# Databases / indexes
+*.db
+*.sqlite
+*.vsidx
+
+# OS junk
+.DS_Store
+Thumbs.db

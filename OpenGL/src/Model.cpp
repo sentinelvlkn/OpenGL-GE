@@ -129,7 +129,7 @@ unsigned int TextureFromFile(const char *path, const std::string &directory, boo
 	int width, height, nrComponents;
 	unsigned char* data = stbi_load(fileName.c_str(), &width, &height, &nrComponents, 0);
 	if(data){
-		GLenum format;
+		GLenum format = GL_RGB;
 		switch (nrComponents) {
 			case 1:
 				format = GL_RED;
@@ -149,8 +149,8 @@ unsigned int TextureFromFile(const char *path, const std::string &directory, boo
 		
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTextureParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glTextureParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 		stbi_image_free(data);
 	}
