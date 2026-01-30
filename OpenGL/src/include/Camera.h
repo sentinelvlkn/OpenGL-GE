@@ -51,6 +51,8 @@ public:
 
 	void processMouseScroll(float yoffset);
 
+	void setLookAt(const glm::vec3 &position, const glm::vec3 &target);
+
 private:
 	void updateCameraVectors();
 };

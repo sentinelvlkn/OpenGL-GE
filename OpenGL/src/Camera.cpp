@@ -83,3 +83,15 @@ void Camera::updateCameraVectors()
     Right = glm::normalize(glm::cross(Front, WorldUp));  
     Up    = glm::normalize(glm::cross(Right, Front));
 }
+
+void Camera::setLookAt(const glm::vec3& position, const glm::vec3& target) {
+	
+    Position = position;
+
+    WorldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+
+    Front = glm::normalize(target - position);
+	Right = glm::normalize(glm::cross(Front, WorldUp));
+	Up = glm::normalize(glm::cross(Right, Front));
+
+}

@@ -10,4 +10,6 @@ void main(){
 	vec3 col =  texture(screenTexture, TexCoords).rgb;
 	col *= fade;
 	FragColor = vec4(col, 1.0);
+	//FragColor = texture(screenTexture, TexCoords);
+
 }
