@@ -6,6 +6,7 @@
 #include "include/Camera.h"
 #include "include/Model.h"
 #include "include/Room.h"
+#include "include/Player.h"
 #include "stb_image.h"
 #include "include/FileSystem.h"
 #include "glm/glm.hpp"
@@ -18,6 +19,10 @@
 #include <glm/trigonometric.hpp>
 #include <iostream>
 #include "include/test_vertices.h"
+
+static bool circleAABBIntersectXZ(const glm::vec3& pos, float radius, const AABB& box);
+
+
 
 int WIDTH = 800;
 int HEIGHT = 600;
@@ -108,7 +113,9 @@ int main()
 	);
 
 	Model testRoomModel(FileSystem::pathFromRoot(testRoom.modelPath).c_str());
-	glm::vec3 playerPos = testRoom.playerSpawn;
+	
+	Player player;
+	player.position = testRoom.playerSpawn;
 
 	//skybox
 	unsigned int skyboxVAO, skyboxVBO;
@@ -195,8 +202,50 @@ int main()
 
 
 		processInput(window);
-		roomCameraSwitch(testRoom, playerPos);
+
+		glm::vec3 camForward = camera.Front;
+		camForward.y = 0.0f;
+		camForward = glm::normalize(camForward);
+
+		glm::vec3 camRight = -glm::normalize(glm::cross(camForward, glm::vec3(0, 1, 0)));
+
+		glm::vec3 moveDir(0.0f);
+
+		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+       			 moveDir += camForward;
+    		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+       			 moveDir -= camForward;
+    		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        		moveDir -= camRight;
+ 		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        		moveDir += camRight;
+	
+		if (glm::length(moveDir) > 0.0f)
+			moveDir = glm::normalize(moveDir);
+
+		glm::vec3 nextPos = player.position + moveDir * player.speed * deltaTime;
+
+		bool blocked = false;
+		const float playerRadius = 0.3f;
+
+		for(const auto& wall : testRoom.colliders) {
+			if(circleAABBIntersectXZ(nextPos, playerRadius, wall)){
+				blocked = true;
+				break;
+			}
+		}
+		
+		if(!blocked) 
+			player.position = nextPos;
+
+		roomCameraSwitch(testRoom, player.position);
 		applyRoomCamera(testRoom, camera);
+		
+		static int lastCam = -1;
+		if (testRoom.activeCamera != lastCam) {
+		    std::cout << "Active camera: " << testRoom.activeCamera << "\n";
+		    lastCam = testRoom.activeCamera;
+		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 		glEnable(GL_DEPTH_TEST);
@@ -219,7 +268,8 @@ int main()
     	
 		
 		glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
-        glDepthMask(GL_FALSE);
+        
+		glDepthMask(GL_FALSE);
 		
 		//skybShader.use();
   //      glm::mat4 skyView = glm::mat4(glm::mat3(camera.getViewMatrix())); // remove translation from the view matrix
@@ -276,20 +326,21 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height){
 }
 
 void processInput(GLFWwindow* window){
+
 	if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
 
-	if(glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-		camera.processKeyboard(FORWARD, deltaTime);
+	//if(glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+	// 	camera.processKeyboard(FORWARD, deltaTime);
 
-	if(glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-		camera.processKeyboard(BACKWARD, deltaTime);
+	//if(glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+	//	camera.processKeyboard(BACKWARD, deltaTime);
 
-	if(glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-		camera.processKeyboard(LEFT, deltaTime);
+	//if(glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+	//	camera.processKeyboard(LEFT, deltaTime);
 
-	if(glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-		camera.processKeyboard(RIGHT, deltaTime);
+	//if(glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+	//	camera.processKeyboard(RIGHT, deltaTime);
 	//fadeIn sets to true
 	if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS) {
 		fade = 0.0f;
@@ -390,3 +441,12 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
     camera.processMouseScroll(static_cast<float>(yoffset));
 }
 
+static bool circleAABBIntersectXZ(const glm::vec3& pos, float radius, const AABB& box){
+	float closestX = glm::clamp(pos.x, box.min.x, box.max.x);
+	float closestZ = glm::clamp(pos.z, box.min.z, box.max.z);
+
+	float dx = pos.x - closestX;
+	float dz = pos.z - closestZ;
+
+	return (dx * dx + dz * dz) < (radius * radius);
+}

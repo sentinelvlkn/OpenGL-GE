@@ -49,6 +49,21 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 
 		room.cameras.push_back(cam);
 	}
+	
+	if (j.contains("colliders")) {
+		if(!j.at("colliders").is_array())
+			throw std::runtime_error("colliders is not an array: " + jsonPath);
+
+		for(const auto& c : j["colliders"]) {
+			glm::vec3 minB = readVec3(c["min"], "min");
+			glm::vec3 maxB = readVec3(c["max"], "max");
+
+			//glm::vec3 minW, maxW;
+			//convertBlenderAABB(minB, maxB, minW, maxW);
+
+			room.colliders.push_back({minB, maxB});
+		}
+	}
 
 	if (room.cameras.empty())
 		throw std::runtime_error("Room has 0 cameras: " + jsonPath);
