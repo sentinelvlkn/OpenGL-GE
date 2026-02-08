@@ -21,8 +21,12 @@
 #include "include/test_vertices.h"
 
 static bool circleAABBIntersectXZ(const glm::vec3& pos, float radius, const AABB& box);
-
-
+static glm::vec3 getMoveDirInput(GLFWwindow* window, const glm::vec3& camForward, const glm::vec3& camRight);
+static void updatePlayerMovement(GLFWwindow* window, Player& player, const Camera& camera, const Room& room, float deltaTime);
+static void updateFade(float deltaTime);
+static void updateRoomCamera(Room& room, const Player& player, Camera& camera);
+static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& roomModel, Model& playerModel, const Player& player, Camera& camera);
+static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned int textureColorBuffer);
 
 int WIDTH = 800;
 int HEIGHT = 600;
@@ -112,8 +116,23 @@ int main()
 		FileSystem::pathFromRoot("src/models/test_room/test_room.json").c_str()
 	);
 
-	Model testRoomModel(FileSystem::pathFromRoot(testRoom.modelPath).c_str());
-	
+	for (int i = 0; i < testRoom.cameras.size(); ++i) {
+    		auto& c = testRoom.cameras[i];
+	    	std::cout << "Cam " << i
+        	      << " min(" << c.aabbMin.x << "," << c.aabbMin.y << "," << c.aabbMin.z << ") "
+              	<< "max(" << c.aabbMax.x << "," << c.aabbMax.y << "," << c.aabbMax.z << ")\n";
+	}
+
+
+
+	Model testRoomModel(
+		FileSystem::pathFromRoot(testRoom.modelPath).c_str()
+	);
+
+	Model playerModel(
+		FileSystem::pathFromRoot("src/models/test_character/test_character.obj").c_str()
+	);
+
 	Player player;
 	player.position = testRoom.playerSpawn;
 
@@ -144,7 +163,7 @@ int main()
 	shader.use();	
 
 	skybShader.use();
-    skybShader.setInt("skybox", 0);
+    	skybShader.setInt("skybox", 0);
 	
 	screenShader.use();
 	screenShader.setInt("screenTexture", 0);
@@ -185,61 +204,15 @@ int main()
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
 		
-		if (fadeIn) {
-			fade += deltaTime;
-			if (fade >= 1.0f) {
-				fade = 1.0f;
-				fadeIn = false;
-			}
-		} else if (fadeOut) {
-			fade -= deltaTime;
-			if (fade <= 0.0f) {
-				fade = 0.0f;
-				fadeOut = false;
-			}
-		}
-		fade = glm::clamp(fade, 0.0f, 1.0f);
-
+		deltaTime = glm::min(deltaTime, 1.0f/30.0f);
 
 		processInput(window);
 
-		glm::vec3 camForward = camera.Front;
-		camForward.y = 0.0f;
-		camForward = glm::normalize(camForward);
-
-		glm::vec3 camRight = -glm::normalize(glm::cross(camForward, glm::vec3(0, 1, 0)));
-
-		glm::vec3 moveDir(0.0f);
-
-		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-       			 moveDir += camForward;
-    		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-       			 moveDir -= camForward;
-    		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        		moveDir -= camRight;
- 		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        		moveDir += camRight;
-	
-		if (glm::length(moveDir) > 0.0f)
-			moveDir = glm::normalize(moveDir);
-
-		glm::vec3 nextPos = player.position + moveDir * player.speed * deltaTime;
-
-		bool blocked = false;
-		const float playerRadius = 0.3f;
-
-		for(const auto& wall : testRoom.colliders) {
-			if(circleAABBIntersectXZ(nextPos, playerRadius, wall)){
-				blocked = true;
-				break;
-			}
-		}
+		updateFade(deltaTime); //controls fadein/out
 		
-		if(!blocked) 
-			player.position = nextPos;
-
-		roomCameraSwitch(testRoom, player.position);
-		applyRoomCamera(testRoom, camera);
+		updatePlayerMovement(window, player, camera, testRoom, deltaTime); //deals with player movement
+				
+		updateRoomCamera(testRoom, player, camera);	
 		
 		static int lastCam = -1;
 		if (testRoom.activeCamera != lastCam) {
@@ -247,70 +220,19 @@ int main()
 		    lastCam = testRoom.activeCamera;
 		}
 
-		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-		glEnable(GL_DEPTH_TEST);
-		
-		glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		shader.use();
-		
-		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH / (float)HEIGHT , 0.1f, 100.0f);
-		glm::mat4 view = camera.getViewMatrix();
-		shader.setMat4("projection", projection);
-		shader.setMat4("view", view);
-		
-		//model, testRoom currently
-		glm::mat4 model = glm::mat4(1.0f);
-		shader.setMat4("model", model);
-		testRoomModel.Draw(shader);
-		
-    	
-		
-		glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
-        
-		glDepthMask(GL_FALSE);
-		
-		//skybShader.use();
-  //      glm::mat4 skyView = glm::mat4(glm::mat3(camera.getViewMatrix())); // remove translation from the view matrix
-  //      skybShader.setMat4("view", skyView);
-  //      skybShader.setMat4("projection", projection);
-  //      // skybox cube
-  //      glBindVertexArray(skyboxVAO);
-  //      glActiveTexture(GL_TEXTURE0);
-  //      glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
-  //      glDrawArrays(GL_TRIANGLES, 0, 36);
-  //      glBindVertexArray(0);
-
-		glDepthMask(GL_TRUE);
-		glDepthFunc(GL_LESS); // set depth function back to default
-		
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		glViewport(0, 0, WIDTH, HEIGHT);		
-		glDisable(GL_DEPTH_TEST); //disabled so screen-space quad isn't discarded
-		 
-		glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
-		
-		screenShader.use();
-		screenShader.setFloat("fade", fade);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
-
-		glBindVertexArray(quadVAO);
-		glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
-		glDrawArrays(GL_TRIANGLES, 0, 6);	
+		renderSceneToFBO(framebuffer, shader, testRoomModel, playerModel, player, camera);
+		renderScreen(quadVAO, screenShader, textureColorBuffer);
 
 		glfwSwapBuffers(window);
-        glfwPollEvents();
+	        glfwPollEvents();
 	}
 	
 	glDeleteVertexArrays(1, &skyboxVAO);
 	glDeleteVertexArrays(1, &quadVAO);
-    glDeleteBuffers(1, &skyboxVBO);
+    	glDeleteBuffers(1, &skyboxVBO);
 	glDeleteBuffers(1, &quadVBO);
 	glDeleteRenderbuffers(1, &RBO);
-    glDeleteFramebuffers(1, &framebuffer);
+    	glDeleteFramebuffers(1, &framebuffer);
 		
 	glfwTerminate();
     return 0;
@@ -450,3 +372,158 @@ static bool circleAABBIntersectXZ(const glm::vec3& pos, float radius, const AABB
 
 	return (dx * dx + dz * dz) < (radius * radius);
 }
+
+static glm::vec3 getMoveDirInput(GLFWwindow* window, const glm::vec3& camForward, const glm::vec3& camRight){
+	glm::vec3 moveDir(0.0f);
+	
+	if(glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+		moveDir += camForward;
+	if(glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+		moveDir -= camForward;
+	if(glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		moveDir -= camRight;
+	if(glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+		moveDir += camRight;
+	
+	if(glm::length(moveDir) > 0.0f)
+		moveDir = glm::normalize(moveDir);
+
+	return moveDir;
+}
+
+
+static void updatePlayerMovement(GLFWwindow* window,
+                                 Player& player,
+                                 const Camera& camera,
+                                 const Room& room,
+                                 float deltaTime)
+{
+    // clamp dt to reduce tunneling on frame spikes
+    deltaTime = glm::min(deltaTime, 1.0f / 30.0f);
+
+    // camera-relative basis (flattened)
+    glm::vec3 camForward = camera.Front;
+    camForward.y = 0.0f;
+    if (glm::length(camForward) > 0.0001f) camForward = glm::normalize(camForward);
+    else camForward = glm::vec3(0, 0, -1);
+
+    glm::vec3 camRight = camera.Right;
+    camRight.y = 0.0f;
+    if (glm::length(camRight) > 0.0001f) camRight = glm::normalize(camRight);
+    else camRight = glm::vec3(1, 0, 0);
+
+    glm::vec3 moveDir = getMoveDirInput(window, camForward, camRight);
+    if (glm::length(moveDir) < 0.0001f)
+        return;
+
+    const float playerRadius = 0.40f;
+
+    // substeps
+    const int steps = 4;
+    const float dt = deltaTime / (float)steps;
+
+    static int lastHit = -1;
+
+    for (int s = 0; s < steps; ++s) {
+        glm::vec3 nextPos = player.position + moveDir * player.speed * dt;
+
+        bool blocked = false;
+        int hitIndex = -1;
+
+        for (int i = 0; i < (int)room.colliders.size(); ++i) {
+            if (circleAABBIntersectXZ(nextPos, playerRadius, room.colliders[i])) {
+                blocked = true;
+                hitIndex = i;
+                break;
+            }
+        }
+
+        if (blocked) {
+            if (hitIndex != lastHit) {
+                std::cout << "Blocked by collider #" << hitIndex << "\n";
+                lastHit = hitIndex;
+            }
+            return; // stop moving further this frame
+        }
+
+        // not blocked -> commit this substep
+        player.position = nextPos;
+        lastHit = -1;
+    }
+}
+
+static void updateFade(float deltaTime) {
+	if(fadeIn){
+		fade += deltaTime;
+		if(fade >= 1.0f){
+			fade = 1.0f;
+			fadeIn = false;
+		}
+	} else if (fadeOut) {
+		fade -= deltaTime;
+		if(fade <= 0.0f){
+			fade = 0.0f;
+			fadeOut = false;
+		}
+	}
+
+	fade = glm::clamp(fade, 0.0f, 1.0f);
+}
+
+	
+static void updateRoomCamera(Room& room, const Player& player, Camera& camera){
+	roomCameraSwitch(room, player.position);
+	applyRoomCamera(room, camera);
+}
+
+static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& roomModel, Model& playerModel, const Player& player, Camera& camera){
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	glEnable(GL_DEPTH_TEST);
+	glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	shader.use();
+	glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH/(float)HEIGHT, 0.1f, 100.0f);
+	glm::mat4 view = camera.getViewMatrix();
+	shader.setMat4("projection", projection);
+	shader.setMat4("view", view);
+
+	glm::mat4 model = glm::mat4(1.0f);
+    model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0,1,0));
+	shader.setMat4("model", model);
+	roomModel.Draw(shader);
+	
+	glm::mat4 playerMo = glm::mat4(1.0f);
+	playerMo = glm::translate(playerMo, player.position);
+	shader.setMat4("model", playerMo);
+	playerModel.Draw(shader);
+}
+
+static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned int textureColorBuffer){
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, WIDTH, HEIGHT);
+	glDisable(GL_DEPTH_TEST);
+
+	glClearColor(1,1,1,1);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	screenShader.use();
+	screenShader.setFloat("fade" , fade);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
+
+	glBindVertexArray(quadVAO);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	glBindVertexArray(0);
+}
+
+
+
+
+
+
+
+
+
+

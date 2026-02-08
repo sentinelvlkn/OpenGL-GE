@@ -44,8 +44,22 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 		glm::vec3 minB = readVec3(jc.at("zoneMin"), "zoneMin");
 		glm::vec3 maxB = readVec3(jc.at("zoneMax"), "zoneMax");
 		convertBlenderAABB(minB, maxB, cam.aabbMin, cam.aabbMax);
+        
+        std::cout << "Converted zone (Engine): min("
+          << cam.aabbMin.x << "," << cam.aabbMin.y << "," << cam.aabbMin.z
+          << ") max("
+          << cam.aabbMax.x << "," << cam.aabbMax.y << "," << cam.aabbMax.z
+          << ")\n";
+
 
 		cam.fov = jc.value("fov", 45.0f);
+        
+        std::cout << "JSON zoneMin (Blender): "
+          << minB.x << "," << minB.y << "," << minB.z
+          << "  zoneMax: "
+          << maxB.x << "," << maxB.y << "," << maxB.z
+          << "\n";
+
 
 		room.cameras.push_back(cam);
 	}
@@ -57,12 +71,18 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 		for(const auto& c : j["colliders"]) {
 			glm::vec3 minB = readVec3(c["min"], "min");
 			glm::vec3 maxB = readVec3(c["max"], "max");
+		
+			glm::vec3 minW, maxW;
+			convertBlenderAABB(minB, maxB, minW, maxW);
 
-			//glm::vec3 minW, maxW;
-			//convertBlenderAABB(minB, maxB, minW, maxW);
+			glm::vec3 minE = glm::min(minW, maxW);
+			glm::vec3 maxE = glm::max(minW, maxW);
 
-			room.colliders.push_back({minB, maxB});
-		}
+			room.colliders.push_back({minE, maxE});
+
+			
+
+			}
 	}
 
 	if (room.cameras.empty())
