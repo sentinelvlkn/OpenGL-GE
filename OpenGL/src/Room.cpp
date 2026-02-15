@@ -85,6 +85,35 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 			}
 	}
 
+	if (j.contains("doors")) {
+	    if (!j.at("doors").is_array())
+        	throw std::runtime_error("doors is not an array: " + jsonPath);
+
+	    for (const auto& d : j.at("doors")) {
+        	DoorTrigger door;
+
+	        glm::vec3 minB = readVec3(d.at("min"), "min");
+        	glm::vec3 maxB = readVec3(d.at("max"), "max");
+
+	        glm::vec3 minW, maxW;
+        	convertBlenderAABB(minB, maxB, minW, maxW);
+	        door.aabb.min = glm::min(minW, maxW);
+        	door.aabb.max = glm::max(minW, maxW);
+
+	        door.targetRoomJson = d.value("targetRoom", "");
+        	if (door.targetRoomJson.empty())
+	            throw std::runtime_error("door missing targetRoom: " + jsonPath);
+
+               if (d.contains("targetSpawn"))
+		    door.targetSpawn = readVec3(d.at("targetSpawn"), "targetSpawn");
+		else
+        	    door.targetSpawn = glm::vec3(0.0f);
+
+	        room.doors.push_back(door);
+	}
+	}
+	
+
 	if (room.cameras.empty())
 		throw std::runtime_error("Room has 0 cameras: " + jsonPath);
 

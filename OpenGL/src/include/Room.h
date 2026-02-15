@@ -22,6 +22,12 @@ struct RoomCamera {
 	glm::vec3 aabbMax;
 };
 
+struct DoorTrigger{
+	AABB aabb;
+	std::string targetRoomJson;
+	glm::vec3 targetSpawn;
+};
+
 struct Room {
 	std::string name;
 	std::string modelPath;
@@ -32,6 +38,7 @@ struct Room {
 	glm::vec3 playerSpawn;
 
 	std::vector<AABB> colliders;
+	std::vector<DoorTrigger> doors;
 };
 
 //checks if a point (p) is within boundaries defined with glm::vec3(s) 

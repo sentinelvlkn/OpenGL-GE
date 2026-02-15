@@ -18,6 +18,7 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/trigonometric.hpp>
 #include <iostream>
+#include <memory>
 #include "include/test_vertices.h"
 
 static bool circleAABBIntersectXZ(const glm::vec3& pos, float radius, const AABB& box);
@@ -27,6 +28,8 @@ static void updateFade(float deltaTime);
 static void updateRoomCamera(Room& room, const Player& player, Camera& camera);
 static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& roomModel, Model& playerModel, const Player& player, Camera& camera);
 static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned int textureColorBuffer);
+static bool keyPressedOnce(GLFWwindow* window, int key);
+static const DoorTrigger* getDoorInRange(const Room& room, const glm::vec3& playerPos);
 
 int WIDTH = 800;
 int HEIGHT = 600;
@@ -125,7 +128,7 @@ int main()
 
 
 
-	Model testRoomModel(
+	std::unique_ptr<Model> testRoomModel = std::make_unique<Model>(
 		FileSystem::pathFromRoot(testRoom.modelPath).c_str()
 	);
 
@@ -135,6 +138,11 @@ int main()
 
 	Player player;
 	player.position = testRoom.playerSpawn;
+
+	bool transitioning = false;
+	std::string pendingRoomJson;
+	glm::vec3 pendingSpawn(0.0f);
+	
 
 	//skybox
 	unsigned int skyboxVAO, skyboxVBO;
@@ -198,34 +206,73 @@ int main()
 	lastFrame = static_cast<float>(glfwGetTime());
 
 	//main game loop
-	while(!glfwWindowShouldClose(window)){
+	while (!glfwWindowShouldClose(window)) {
+    		float currentFrame = static_cast<float>(glfwGetTime());
+    		deltaTime = currentFrame - lastFrame;
+    		lastFrame = currentFrame;
 
-		float currentFrame = static_cast<float>(glfwGetTime());
-		deltaTime = currentFrame - lastFrame;
-		lastFrame = currentFrame;
-		
-		deltaTime = glm::min(deltaTime, 1.0f/30.0f);
+    		deltaTime = glm::min(deltaTime, 1.0f/30.0f);
 
-		processInput(window);
+    		processInput(window);
 
-		updateFade(deltaTime); //controls fadein/out
-		
-		updatePlayerMovement(window, player, camera, testRoom, deltaTime); //deals with player movement
+    		updateFade(deltaTime);
+
+    		// If fade-out finished, swap rooms
+    		if (transitioning && !fadeOut && fade <= 0.0f) {
+       			try {
+				testRoom = loadRoomFromJson(FileSystem::pathFromRoot(pendingRoomJson).c_str());
+			
+				roomModel = std::make_unique<Model>(
+					FileSystem::pathFromRoot(testRoom.models).c_str()
+				);
 				
-		updateRoomCamera(testRoom, player, camera);	
-		
-		static int lastCam = -1;
+				player.position = pendingSpawn;
+				roomCameraSwitch(testRoom, player.position);
+        			applyRoomCamera(testRoom, camera);
+				
+			} catch (const std::exception& e) {
+				std::cerr << "Room failed to load: " << e.what() << "\n";
+				transitioning = false;
+				pendingRoomJson.clear();
+
+				fade = 0.0f;
+				fadeIn = true;
+				fadeOut = false;
+			}
+        		
+   	 	}
+
+    		// Gameplay only when not transitioning
+    		if (!transitioning) {
+        		updatePlayerMovement(window, player, camera, testRoom, deltaTime);
+
+        		const DoorTrigger* door = getDoorInRange(testRoom, player.position);
+        		if (door && keyPressedOnce(window, GLFW_KEY_E)) {
+           			transitioning = true;
+            			pendingRoomJson = door->targetRoomJson;
+            			pendingSpawn = door->targetSpawn;
+
+            			fade = 1.0f;
+            			fadeOut = true;
+            			fadeIn = false;
+        		}
+
+        		updateRoomCamera(testRoom, player, camera);
+    		}
+
+    
+   		static int lastCam = -1;
 		if (testRoom.activeCamera != lastCam) {
-		    std::cout << "Active camera: " << testRoom.activeCamera << "\n";
-		    lastCam = testRoom.activeCamera;
+        		std::cout << "Active camera: " << testRoom.activeCamera << "\n";
+        		lastCam = testRoom.activeCamera;
 		}
 
 		renderSceneToFBO(framebuffer, shader, testRoomModel, playerModel, player, camera);
 		renderScreen(quadVAO, screenShader, textureColorBuffer);
 
 		glfwSwapBuffers(window);
-	        glfwPollEvents();
-	}
+		glfwPollEvents();
+	}	
 	
 	glDeleteVertexArrays(1, &skyboxVAO);
 	glDeleteVertexArrays(1, &quadVAO);
@@ -518,8 +565,21 @@ static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned in
 	glBindVertexArray(0);
 }
 
+static bool keyPressedOnce(GLFWwindow* window, int key) {
+    static bool wasDown[GLFW_KEY_LAST + 1] = { false };
+    bool down = glfwGetKey(window, key) == GLFW_PRESS;
+    bool pressed = down && !wasDown[key];
+    wasDown[key] = down;
+    return pressed;
+}
 
-
+static const DoorTrigger* getDoorInRange(const Room& room, const glm::vec3& playerPos) {
+    for (const auto& d : room.doors) {
+        if (pointInsideAabb(playerPos, d.aabb.min, d.aabb.max))
+            return &d;
+    }
+    return nullptr;
+}
 
 
 
