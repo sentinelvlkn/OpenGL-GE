@@ -222,13 +222,20 @@ int main()
        			try {
 				testRoom = loadRoomFromJson(FileSystem::pathFromRoot(pendingRoomJson).c_str());
 			
-				roomModel = std::make_unique<Model>(
-					FileSystem::pathFromRoot(testRoom.models).c_str()
+				testRoomModel = std::make_unique<Model>(
+					FileSystem::pathFromRoot(testRoom.modelPath).c_str()
 				);
 				
 				player.position = pendingSpawn;
 				roomCameraSwitch(testRoom, player.position);
         			applyRoomCamera(testRoom, camera);
+
+				fade = 0.0f;
+				fadeIn = true;
+				fadeOut = false;
+
+				transitioning = false;
+				pendingRoomJson.clear();
 				
 			} catch (const std::exception& e) {
 				std::cerr << "Room failed to load: " << e.what() << "\n";
@@ -267,7 +274,7 @@ int main()
         		lastCam = testRoom.activeCamera;
 		}
 
-		renderSceneToFBO(framebuffer, shader, testRoomModel, playerModel, player, camera);
+		renderSceneToFBO(framebuffer, shader, *testRoomModel, playerModel, player, camera);
 		renderScreen(quadVAO, screenShader, textureColorBuffer);
 
 		glfwSwapBuffers(window);
@@ -536,7 +543,7 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 	shader.setMat4("view", view);
 
 	glm::mat4 model = glm::mat4(1.0f);
-    model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0,1,0));
+        //model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0,1,0));
 	shader.setMat4("model", model);
 	roomModel.Draw(shader);
 	

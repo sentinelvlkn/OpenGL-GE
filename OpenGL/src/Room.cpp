@@ -105,7 +105,7 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 	            throw std::runtime_error("door missing targetRoom: " + jsonPath);
 
                if (d.contains("targetSpawn"))
-		    door.targetSpawn = readVec3(d.at("targetSpawn"), "targetSpawn");
+		    door.targetSpawn = convertBlenderCoords(readVec3(d.at("targetSpawn"), "targetSpawn"));
 		else
         	    door.targetSpawn = glm::vec3(0.0f);
 

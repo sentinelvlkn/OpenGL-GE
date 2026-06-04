@@ -1,0 +1,88 @@
+How the py script for serializing Blender models to json is to be used
+
+The engine converts Blender coordinates as:
+	engine = glm::vec3(blender.x, blender.z, -blender.y);
+
+You should check the initial config values at the top of the script everytime before running it for a specific room.
+
+Change this per room: ROOM_ID = [some name]
+Examples:
+   ROOM_ID = "testRoom"
+   ROOM_ID = "Room01"
+   ROOM_ID = "room02"
+
+Also change CAMERA_NAMES:
+e.g CAMERA_NAMES = ["Cam01", "Cam02"]
+make sure to follow the format of two digits and start from 01
+
+
+Set ROOM_WALLS_OBJECT to match the mesh used to calculate outer wall bounds.
+e.g ROOM_WALLS_OBJECT = "room_walls"
+
+
+Naming convention in Blender for my game engine:
+Required:
+	PlayerSpawn
+	
+	Cameras:
+		Cam[number e.g 0]_Pos
+		Cam[number e.g 0]_Target
+		Cam[number e.g 0]_Zone
+	Colliders:
+		Any mesh object whose name starts wih Col_:
+			e.g Col_Wall_Left, Col_Table, Col_Blocker_01
+	Doors:
+		Door_01
+		Door_Hallway
+		Door_01_Spawn and etc.				
+
+How to set door target room (fov) in Blender:
+	Select door cube/object and:
+		Object properties -> Custom properties -> Add
+	Add:
+		targetRoom (fov)
+	Value example:
+		src/models/room02/room02.json
+	The script shall output: "targetRoom": "src/models/room02/room02.json"
+
+Example setup with two cameras and one door:
+	PlayerSpawn
+
+	Cam01_Pos
+	Cam01_Target
+	Cam01_Zone
+
+	Cam02_Pos
+	Cam02_Target
+	Cam02_Zone
+
+	Col_Wall_Left
+	Col_Wall_Right
+	Col_BackWall
+	Col_Table
+
+	Door_01
+	Door_01_Spawn
+
+
+
+
+Important reminders:
+
+For all Cam*_Zone, Col_*, Door_* objects:
+1. Keep them axis-aligned for now
+2. Apply transforms: Ctrl + A -> Rotation & Scale!!!!
+3. Make zones and doors tall in Blender Z, because Blender Z will be transformer to Y by the engine
+4. For the doors, create a cube that will act as a trigger zone for door transition, add a custom property called "targetRoom" as String and then put the path
+to the .json of the next room
+The loader should convert
+ 
+playerSpawn
+camera position
+camera target
+camera zones
+colliders
+doors
+
+from Blender space into engine space.
+
