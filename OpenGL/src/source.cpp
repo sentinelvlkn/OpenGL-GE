@@ -7,6 +7,7 @@
 #include "include/Model.h"
 #include "include/Room.h"
 #include "include/Player.h"
+#include "include/Interaction.h"
 #include "stb_image.h"
 #include "include/FileSystem.h"
 #include "glm/glm.hpp"
@@ -30,6 +31,9 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned int textureColorBuffer);
 static bool keyPressedOnce(GLFWwindow* window, int key);
 static const DoorTrigger* getDoorInRange(const Room& room, const glm::vec3& playerPos);
+static Interaction* getInteractionInRange(Room& room, const glm::vec3& playerPos);
+static void runInteraction(Interaction& interaction);
+
 
 int WIDTH = 800;
 int HEIGHT = 600;
@@ -263,6 +267,11 @@ int main()
             			fadeOut = true;
             			fadeIn = false;
         		}
+			else if (keyPressedOnce(window, GLFW_KEY_E)) {
+				Interaction* interaction = getInteractionInRange(testRoom, player.position);
+				if (interaction) 
+					runInteraction(*interaction);
+			}
 
         		updateRoomCamera(testRoom, player, camera);
     		}
@@ -588,7 +597,43 @@ static const DoorTrigger* getDoorInRange(const Room& room, const glm::vec3& play
     return nullptr;
 }
 
+static Interaction* getInteractionInRange(Room& room, const glm::vec3& playerPos){
+	for (auto& interaction : room.interactions) {
+		if (!interaction.repeatable && interaction.used) 
+			continue;
 
+		if (pointInsideAabb(playerPos, interaction.trigger))
+			return &interaction;
+	}
+
+	return nullptr;
+}
+
+static void runInteraction(Interaction& interaction){
+	switch (interaction.type){
+		case InteractionType::Message:
+			std::cout << "[MESSAGE] " << interaction.message << "\n";
+			break;
+
+		case InteractionType::Note:
+			std::cout << "[NOTE] Open note asset: " << interaction.assetPath << "\n";
+			break;
+
+		case InteractionType::Pickup:
+			std::cout << "[PICKUP] Picked up: " << interaction.targetId << "\n";
+			break;
+
+		case InteractionType::Switch:
+			std::cout << "[SWICTH] Triggered: " << interaction.targetId << "\n";
+			break;
+
+		default:
+			std::cout << "[INTERACTION] Unknown interaction: " << interaction.id << "\n";
+			break;
+	}
+
+	interaction.used = true;
+}
 
 
 

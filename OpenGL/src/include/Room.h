@@ -3,15 +3,12 @@
 #include <string>
 #include <glm/glm.hpp>
 #include "Camera.h"
+#include "AABB.h"
+#include "Interaction.h"
 #include "thirdparty/json.hpp"
 #include <iostream>
 
 using json = nlohmann::json;
-
-struct AABB {
-	glm::vec3 min;
-	glm::vec3 max;
-};
 
 struct RoomCamera {
 	glm::vec3 position;
@@ -39,14 +36,10 @@ struct Room {
 
 	std::vector<AABB> colliders;
 	std::vector<DoorTrigger> doors;
+	std::vector<Interaction> interactions;
 };
 
-//checks if a point (p) is within boundaries defined with glm::vec3(s) 
-inline bool pointInsideAabb(const glm::vec3& p, const glm::vec3& min, const glm::vec3& max) {
-	return	p.x >= min.x && p.x <= max.x && 
-			p.y >= min.y && p.y <= max.y &&
-			p.z >= min.z && p.z <= max.z;
-}
+
 
 //checks within which RoomCamera's reach the player currently is and sets the active Camera accordingly
 inline void roomCameraSwitch(Room &room, const glm::vec3 &playerPos) {

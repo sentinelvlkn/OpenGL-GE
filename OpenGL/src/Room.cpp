@@ -1,4 +1,5 @@
 #include "Room.h"
+#include "Interaction.h"
 #include <fstream>
 #include <stdexcept>
 #include <iostream>
@@ -110,7 +111,37 @@ Room loadRoomFromJson(const std::string &jsonPath) {
         	    door.targetSpawn = glm::vec3(0.0f);
 
 	        room.doors.push_back(door);
+		}
 	}
+
+	if (j.contains("interactions")) {
+		if (!j.at("interactions").is_array())
+			throw std::runtime_error ("interactions is not an array: " + jsonPath);
+			
+		for (const auto& ji : j.at("interactions")) {
+			Interaction interaction;
+
+			interaction.id = ji.value("id", "");
+			interaction.type = interactionTypeFromString(ji.value("type", "unknown"));
+
+			interaction.message = ji.value("message", "");
+			interaction.assetPath = ji.value("asset", "");
+			interaction.targetId = ji.value("targetId", "");
+
+			interaction.repeatable = ji.value("repeatable", true);
+			interaction.used = false;
+
+			glm::vec3 minB = readVec3(ji.at("min"), "interaction min");
+			glm::vec3 maxB = readVec3(ji.at("max"), "interaction max");
+
+			glm::vec3 minW, maxW;
+			convertBlenderAABB(minB, maxB, minW, maxW);
+
+			interaction.trigger.min = glm::min(minW, maxW);
+			interaction.trigger.max = glm::max(minW, maxW);
+
+			room.interactions.push_back(interaction);
+		}
 	}
 	
 

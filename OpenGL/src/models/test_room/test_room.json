@@ -118,10 +118,27 @@
       ],
       "targetRoom": "src/models/test_room02/test_room02.json",
       "targetSpawn": [
-        4.88757,
-        1.11574,
-        3.34542
+        -1.35804,
+        -1.06828,
+        4.96581
       ]
+    }
+  ],
+  "interactions": [
+    {
+      "id": "note_01",
+      "type": "message",
+      "min": [
+        -1.0,
+        -5.50284,
+        -1.02887
+      ],
+      "max": [
+        1.0,
+        -3.50284,
+        0.97113
+      ],
+      "repeatable": true
     }
   ]
 }

@@ -216,6 +216,39 @@ def export_room_json():
     if USE_TEMP_DOOR:
         doors.extend(TEMP_DOORS)
 
+    interactions = []
+
+    for obj in bpy.data.objects:
+        if obj.type == "MESH" and obj.name.startswith("Interact_"):
+            mn, mx = world_aabb(obj)
+
+            interaction_id = str(obj.get("id", obj.name))
+            interaction_type = str(obj.get("type", "message"))
+            message = str(obj.get("message", ""))
+            asset = str(obj.get("asset", ""))
+            target_id = str(obj.get("targetId", ""))
+            repeatable = bool(obj.get("repeatable", True))
+
+            interaction = {
+                        "id": interaction_id,
+                        "type": interaction_type,
+                        "min": vec3(mn),
+                        "max": vec3(mx),
+                        "repeatable": repeatable
+                    }
+
+            if message:
+                interaction["message"] = message
+
+            if asset:
+                interaction["asset"] = asset
+
+            if target_id:
+                interaction["targetId"] = target_id
+
+            interactions.append(interaction)
+
+
     #-------------- final json--------------
     room_json = {
         "name": ROOM_NAME,
@@ -223,7 +256,8 @@ def export_room_json():
         "playerSpawn": player_spawn,
         "cameras": cameras,
         "colliders": colliders,
-        "doors": doors
+        "doors": doors,
+        "interactions": interactions 
     }
 
     # Save next to the .blend file if the .blend is saved
