@@ -60,6 +60,9 @@ float fade = 0.0f;
 bool fadeIn = true; 
 bool fadeOut = false;
 
+static bool messageOpen = false;
+static std::string activeMessage;
+
 int main()
 {
 	glfwInit();
@@ -255,24 +258,37 @@ int main()
 
     		// Gameplay only when not transitioning
     		if (!transitioning) {
-        		updatePlayerMovement(window, player, camera, testRoom, deltaTime);
+			bool pressedE = keyPressedOnce(window, GLFW_KEY_E);
 
-        		const DoorTrigger* door = getDoorInRange(testRoom, player.position);
-        		if (door && keyPressedOnce(window, GLFW_KEY_E)) {
-           			transitioning = true;
-            			pendingRoomJson = door->targetRoomJson;
-            			pendingSpawn = door->targetSpawn;
+			if (messageOpen) {
+				if (pressedE){
+					messageOpen = false;
+					activeMessage.clear();
 
-            			fade = 1.0f;
-            			fadeOut = true;
-            			fadeIn = false;
-        		}
-			else if (keyPressedOnce(window, GLFW_KEY_E)) {
-				Interaction* interaction = getInteractionInRange(testRoom, player.position);
-				if (interaction) 
-					runInteraction(*interaction);
+					std::cout << "[MESSAGE CLOSED]\n";
+				}
 			}
+			else {
+	        		updatePlayerMovement(window, player, camera, testRoom, deltaTime);
 
+        			const DoorTrigger* door = getDoorInRange(testRoom, player.position);
+        			
+				if (door && pressedE) {
+	           			transitioning = true;
+        	    			pendingRoomJson = door->targetRoomJson;
+            				pendingSpawn = door->targetSpawn;
+
+            				fade = 1.0f;
+            				fadeOut = true;
+	            			fadeIn = false;
+        			}
+				else if (pressedE) {
+					Interaction* interaction = getInteractionInRange(testRoom, player.position);
+
+					if (interaction) 
+						runInteraction(*interaction);
+				}
+			}
         		updateRoomCamera(testRoom, player, camera);
     		}
 
@@ -612,23 +628,37 @@ static Interaction* getInteractionInRange(Room& room, const glm::vec3& playerPos
 static void runInteraction(Interaction& interaction){
 	switch (interaction.type){
 		case InteractionType::Message:
+			activeMessage = interaction.message;
+			messageOpen = true;
+
 			std::cout << "[MESSAGE] " << interaction.message << "\n";
+			std::cout << "Press E to close" << "\n";
+
 			break;
 
 		case InteractionType::Note:
 			std::cout << "[NOTE] Open note asset: " << interaction.assetPath << "\n";
+			messageOpen = true;
+
+			std::cout << "Press E to close" << "\n";
 			break;
 
 		case InteractionType::Pickup:
 			std::cout << "[PICKUP] Picked up: " << interaction.targetId << "\n";
+			messageOpen = true;
+			std::cout << "Press E to close" << "\n";
 			break;
 
 		case InteractionType::Switch:
 			std::cout << "[SWICTH] Triggered: " << interaction.targetId << "\n";
+			messageOpen = true;
+			std::cout << "Press E to close" << "\n";
 			break;
 
 		default:
 			std::cout << "[INTERACTION] Unknown interaction: " << interaction.id << "\n";
+			messageOpen = true;
+			std::cout << "Press E to close" << "\n";
 			break;
 	}
 
