@@ -103,8 +103,8 @@
   ],
   "interactions": [
     {
-      "id": "note_01",
-      "type": "message",
+      "id": "test_note",
+      "type": "note",
       "min": [
         -1.35804,
         -1.06828,
@@ -115,8 +115,8 @@
         0.93172,
         6.96581
       ],
-      "repeatable": true,
-      "message": "This is a message to test interactions"
+      "asset": "src/ui/notes/test_note.png",
+      "repeatable": true
     }
   ]
 }

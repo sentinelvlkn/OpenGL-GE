@@ -33,7 +33,7 @@ static bool keyPressedOnce(GLFWwindow* window, int key);
 static const DoorTrigger* getDoorInRange(const Room& room, const glm::vec3& playerPos);
 static Interaction* getInteractionInRange(Room& room, const glm::vec3& playerPos);
 static void runInteraction(Interaction& interaction);
-
+static unsigned int loadTexture2D(const char* path);
 
 int WIDTH = 800;
 int HEIGHT = 600;
@@ -62,6 +62,10 @@ bool fadeOut = false;
 
 static bool messageOpen = false;
 static std::string activeMessage;
+
+static bool noteOpen = false;
+static std::string activeNoteImagePath;
+static unsigned int activeNoteTexture = 0;
 
 int main()
 {
@@ -115,6 +119,11 @@ int main()
 	Shader screenShader(
 		FileSystem::pathFromRoot("src/shaders/fbuffer_vertex_shader.vert").c_str(),
 		FileSystem::pathFromRoot("src/shaders/fbuffer_fragment_shader.frag").c_str()
+	);
+
+	Shader uiShader(
+		FileSystem::pathFromRoot("src/shaders/note_quad.vert").c_str(),
+		FileSystem::pathFromRoot("src/shaders/note_quad.frag").c_str()
 	);
 
 	/*Model backpackModel(
@@ -182,6 +191,9 @@ int main()
 	
 	screenShader.use();
 	screenShader.setInt("screenTexture", 0);
+
+	uiShader.use();
+	uiShader.setInt("uiTexture", 0);
 	
 	//framebuffer
 	unsigned int framebuffer;
@@ -265,6 +277,14 @@ int main()
 					messageOpen = false;
 					activeMessage.clear();
 
+					noteOpen = false;
+					activeNoteImagePath.clear();
+
+					if (activeNoteTexture != 0) {
+						glDeleteTextures(1, &activeNoteTexture);
+						activeNoteTexture = 0;
+					}
+
 					std::cout << "[MESSAGE CLOSED]\n";
 				}
 			}
@@ -301,6 +321,22 @@ int main()
 
 		renderSceneToFBO(framebuffer, shader, *testRoomModel, playerModel, player, camera);
 		renderScreen(quadVAO, screenShader, textureColorBuffer);
+
+		if (noteOpen && activeNoteTexture != 0) {
+			glDisable(GL_DEPTH_TEST);
+
+			uiShader.use();
+
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, activeNoteTexture);
+
+			glBindVertexArray(quadVAO);
+			glDrawArrays(GL_TRIANGLES, 0, 6);
+
+			glBindVertexArray(0);
+
+			glEnable(GL_DEPTH_TEST);
+		}
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -637,9 +673,22 @@ static void runInteraction(Interaction& interaction){
 			break;
 
 		case InteractionType::Note:
-			std::cout << "[NOTE] Open note asset: " << interaction.assetPath << "\n";
+			noteOpen = true;
 			messageOpen = true;
+			
+			activeNoteImagePath = interaction.assetPath;
 
+			if (activeNoteTexture != 0) {
+				glDeleteTextures(1, &activeNoteTexture);
+				activeNoteTexture = 0;
+			}
+
+			activeNoteTexture = loadTexture2D(
+				FileSystem::pathFromRoot(activeNoteImagePath).c_str()
+			);
+
+			std::cout << "[NOTE OPENED] " << activeNoteImagePath << "\n";
+	
 			std::cout << "Press E to close" << "\n";
 			break;
 
@@ -663,6 +712,52 @@ static void runInteraction(Interaction& interaction){
 	}
 
 	interaction.used = true;
+}
+
+//intial idea for this function is to load notes on screen
+//related to Interactions xoxoxox
+static unsigned int loadTexture2D(const char* path) {
+
+	unsigned int textureID;
+	glGenTextures(1, &textureID);
+	
+	int width, height, nrComponents;
+	stbi_set_flip_vertically_on_load(true);
+
+	unsigned char* data = stbi_load(path, &width, &height, &nrComponents, 0);
+
+	if (data) {
+		GLenum format = GL_RGB;
+		
+		switch (nrComponents) {
+			case 1: format = GL_RED; break;
+
+			case 3: format = GL_RGB; break;
+		
+			case 4: format = GL_RGBA; break;
+
+			default: format = GL_RGB; break;
+		}
+
+		glBindTexture(GL_TEXTURE_2D, textureID);
+
+		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	
+		stbi_image_free(data);
+	}
+	else {
+		std::cerr << "Failed to load UI texture: " << path << "\n";
+		stbi_image_free(data);
+	}
+	
+	return textureID;
 }
 
 
