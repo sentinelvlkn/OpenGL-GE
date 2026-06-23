@@ -224,9 +224,11 @@ def export_room_json():
 
             interaction_id = str(obj.get("id", obj.name))
             interaction_type = str(obj.get("type", "message"))
+
             message = str(obj.get("message", ""))
             asset = str(obj.get("asset", ""))
             target_id = str(obj.get("targetId", ""))
+            
             repeatable = bool(obj.get("repeatable", True))
 
             interaction = {

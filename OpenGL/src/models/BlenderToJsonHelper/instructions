@@ -34,7 +34,12 @@ Required:
 	Doors:
 		Door_01
 		Door_Hallway
-		Door_01_Spawn and etc.				
+		Door_01_Spawn and etc.
+
+	Interactions:
+		Interact_TestNote
+		Interact_WallMessage
+		Interact_* and etc.
 
 How to set door target room (fov) in Blender:
 	Select door cube/object and:
@@ -69,12 +74,14 @@ Example setup with two cameras and one door:
 
 Important reminders:
 
-For all Cam*_Zone, Col_*, Door_* objects:
+For all Cam*_Zone, Col_*, Door_*, Interact_* objects:
 1. Keep them axis-aligned for now
 2. Apply transforms: Ctrl + A -> Rotation & Scale!!!!
 3. Make zones and doors tall in Blender Z, because Blender Z will be transformer to Y by the engine
 4. For the doors, create a cube that will act as a trigger zone for door transition, add a custom property called "targetRoom" as String and then put the path
 to the .json of the next room
+*For interactions, also have the properties id (string), type (string), asset (the image's path in string format) and repeatable (bool) added. (message also can laso be added as a property but it is aimed towards the type "message" lol)
+
 The loader should convert
  
 playerSpawn
@@ -83,6 +90,219 @@ camera target
 camera zones
 colliders
 doors
+interactions
 
 from Blender space into engine space.
 
+BLENDER ROOM EXPORT PROCESS
+
+!!!Export only the visible room geometry as OBJ, while the meshes for Doors, Interactions, Colliders that are there just for JSON generation and are not visible shouldn't be included the in the final export!!!!
+
+1. Prep
+
+Visible mesh objects that should be exported:
+
+-room walls
+-prop objects
+-floor/ceiling/walls
+-any visible object like furniture or environment models
+
+Helper objects that do not take part in the OBJ export:
+-camera position, target, zone (e.g Cam01_Pos, Cam01_Target, Cam01_Zone)
+-doors (e.g Door_01, Door_01_Spawn)
+-interaction zones (e.g Interact_OldNote, Interact_Message)
+-colliders (e.g Col_Block)
+-player spawn (e.g PlayerSpawn)
+
+Helper objects are used by the Blender-to-JSON script only!
+
+2. Apply transforms
+
+For visible room meshes:
+- Select the visible mesh objects.
+- Press Ctrl + A.
+- Choose Rotation & Scale.
+
+For helper objects:
+- Select each trigger/collider/zone helper.
+- Press Ctrl + A.
+- Choose Rotation & Scale.
+
+This keeps exported bounds accurate.
+
+3. Export 
+
+
+Select only the visible room geometry:
+- room_walls
+- props
+- floor/ceiling/walls
+- visible environment objects
+
+Do NOT select helper objects:
+- Cam*_Zone
+- Door_*
+- Interact_*
+- Col_*
+- PlayerSpawn
+
+Then:
+
+File -> Export -> Wavefront (.obj)
+
+Use these settings:
+
+Include:
+- Limit to Selected Objects / Selection Only: ON
+- Object Groups: optional
+- Material Groups: optional
+- Animation: OFF
+
+Transform:
+- Scale: 1.00
+- Forward Axis: -Z
+- Up Axis: Y
+
+Geometry:
+- Apply Modifiers: ON
+- Smooth Groups: optional
+- Write Normals: ON
+- Include UVs: ON
+- Write Materials: ON
+- Triangulate Faces: ON if available
+
+Path Mode:
+- Auto or Copy
+- If using textures, make sure texture paths are relative and the .mtl file is exported.
+
+4. Save paths carefully
+
+Example room folder:
+
+src/models/test_room02/
+
+Expected files:
+
+src/models/test_room02/test_room02.obj
+src/models/test_room02/test_room02.mtl
+src/models/test_room02/test_room02.json
+src/models/test_room02/textures/...
+
+The JSON should contain:
+
+"model": "src/models/test_room02/test_room02.obj"
+
+Make sure folder names, file names, and JSON model paths match exactly.
+
+5. Run the Blender-to-JSON script
+
+After exporting the OBJ, run the BlenderToJsonScript.py script.
+
+The script should export helper data into the room JSON:
+- playerSpawn
+- cameras
+- camera zones
+- wall colliders
+- extra Col_* colliders
+- Door_* triggers
+- Interact_* triggers
+
+The helper coordinates are Blender coordinates.
+The C++ room loader converts them into engine coordinates.
+
+6. Interaction helper setup
+
+For message interaction:
+
+Create a cube and name it:
+
+Interact_WallMessage
+
+Add custom properties:
+
+id = wall_message
+type = message
+message = The wall is covered in strange marks.
+repeatable = true
+
+For note image interaction:
+
+Create a cube and name it:
+
+Interact_TestNote
+
+Add custom properties:
+
+id = test_note
+type = note
+asset = src/ui/notes/test_note.png
+repeatable = true
+
+The Interact_* cube should be included in the JSON, but should NOT be exported in the OBJ.
+
+7. Door helper setup
+
+Create a cube where the player should press E.
+Name it:
+
+Door_01
+
+Add custom property:
+
+targetRoom = src/models/test_room02/test_room02.json
+
+Optional:
+Create an empty or helper object named:
+
+Door_01_Spawn
+
+This defines where the player appears in the target room.
+
+8. Player spawn
+
+Optional:
+Create an empty named:
+
+PlayerSpawn
+
+If missing, the script may default to:
+
+[0, 0, 0]
+
+Remember:
+Blender Z becomes engine Y.
+So PlayerSpawn height should be controlled with Blender Z.
+
+9. Texture checklist
+
+If textures appear pink in Blender:
+- Relink missing textures.
+- Use File -> External Data -> Find Missing Files.
+- Then use File -> External Data -> Make Paths Relative.
+
+For engine loading:
+- Keep the .obj, .mtl, and textures together.
+- Prefer relative texture paths in the .mtl file.
+
+10. Engine-side rule
+
+If OBJ is exported with:
+
+Forward Axis: -Z
+Up Axis: Y
+
+Then the room should be rendered with an identity model matrix.
+
+Do NOT rotate the room again in C++.
+
+Correct:
+
+glm::mat4 model = glm::mat4(1.0f);
+shader.setMat4("model", model);
+roomModel.Draw(shader);
+
+Incorrect:
+
+model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0,1,0));
+
+Extra render-time rotation will make the visual mesh disagree with colliders, cameras, doors, and interaction zones.
