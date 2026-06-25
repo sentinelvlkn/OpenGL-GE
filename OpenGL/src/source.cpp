@@ -28,7 +28,7 @@ static void updatePlayerMovement(GLFWwindow* window, Player& player, const Camer
 static void updateFade(float deltaTime);
 static void updateRoomCamera(Room& room, const Player& player, Camera& camera);
 static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& roomModel, Model& playerModel, const Player& player, Camera& camera);
-static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned int textureColorBuffer);
+static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned int textureColorBuffer, float time);
 static bool keyPressedOnce(GLFWwindow* window, int key);
 static const DoorTrigger* getDoorInRange(const Room& room, const glm::vec3& playerPos);
 static Interaction* getInteractionInRange(Room& room, const glm::vec3& playerPos);
@@ -56,9 +56,10 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 //for scene fade in and fade out
-float fade = 0.0f;
-bool fadeIn = true; 
-bool fadeOut = false;
+float fade = 1.0f;
+bool fadeIn = false; //into black
+bool fadeOut = true; //out of black
+bool transitioning = false;
 
 static bool messageOpen = false;
 static std::string activeMessage;
@@ -155,7 +156,7 @@ int main()
 	Player player;
 	player.position = testRoom.playerSpawn;
 
-	bool transitioning = false;
+	
 	std::string pendingRoomJson;
 	glm::vec3 pendingSpawn(0.0f);
 	
@@ -190,7 +191,11 @@ int main()
     	skybShader.setInt("skybox", 0);
 	
 	screenShader.use();
-	screenShader.setInt("screenTexture", 0);
+	//screenShader.setInt("screenTexture", 0);
+	screenShader.setFloat("vignetteStrength", 0.5f);
+	screenShader.setFloat("grainStrength", 0.02f);
+	screenShader.setFloat("saturation", 0.7f);
+	screenShader.setFloat("contrast", 1.2f);
 
 	uiShader.use();
 	uiShader.setInt("uiTexture", 0);
@@ -230,6 +235,8 @@ int main()
     		deltaTime = currentFrame - lastFrame;
     		lastFrame = currentFrame;
 
+		float time = static_cast<float>(glfwGetTime());
+
     		deltaTime = glm::min(deltaTime, 1.0f/30.0f);
 
     		processInput(window);
@@ -237,7 +244,7 @@ int main()
     		updateFade(deltaTime);
 
     		// If fade-out finished, swap rooms
-    		if (transitioning && !fadeOut && fade <= 0.0f) {
+    		if (transitioning && !fadeIn && fade >= 1.0f) {
        			try {
 				testRoom = loadRoomFromJson(FileSystem::pathFromRoot(pendingRoomJson).c_str());
 			
@@ -249,21 +256,24 @@ int main()
 				roomCameraSwitch(testRoom, player.position);
         			applyRoomCamera(testRoom, camera);
 
-				fade = 0.0f;
-				fadeIn = true;
-				fadeOut = false;
+				fade = 1.0f;
+				fadeIn = false;
+				fadeOut = true;
 
 				transitioning = false;
 				pendingRoomJson.clear();
 				
 			} catch (const std::exception& e) {
+
 				std::cerr << "Room failed to load: " << e.what() << "\n";
+				
+				fade = 1.0f;
+				fadeIn = false;
+				fadeOut = true;
+
 				transitioning = false;
 				pendingRoomJson.clear();
 
-				fade = 0.0f;
-				fadeIn = true;
-				fadeOut = false;
 			}
         		
    	 	}
@@ -294,13 +304,15 @@ int main()
         			const DoorTrigger* door = getDoorInRange(testRoom, player.position);
         			
 				if (door && pressedE) {
+					fade = 0.0f;
+            				fadeOut = false;
+	            			fadeIn = true;
+
 	           			transitioning = true;
         	    			pendingRoomJson = door->targetRoomJson;
             				pendingSpawn = door->targetSpawn;
 
-            				fade = 1.0f;
-            				fadeOut = true;
-	            			fadeIn = false;
+            				
         			}
 				else if (pressedE) {
 					Interaction* interaction = getInteractionInRange(testRoom, player.position);
@@ -320,7 +332,7 @@ int main()
 		}
 
 		renderSceneToFBO(framebuffer, shader, *testRoomModel, playerModel, player, camera);
-		renderScreen(quadVAO, screenShader, textureColorBuffer);
+		renderScreen(quadVAO, screenShader, textureColorBuffer, time);
 
 		if (noteOpen && activeNoteTexture != 0) {
 			glDisable(GL_DEPTH_TEST);
@@ -614,7 +626,8 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 	playerModel.Draw(shader);
 }
 
-static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned int textureColorBuffer){
+static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned int textureColorBuffer, float time) {
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, WIDTH, HEIGHT);
 	glDisable(GL_DEPTH_TEST);
@@ -623,7 +636,17 @@ static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned in
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	screenShader.use();
+
+	screenShader.setInt("screenTexture", 0);
+
 	screenShader.setFloat("fade" , fade);
+	screenShader.setFloat("time", time);
+
+	screenShader.setFloat("vignetteStrength", 0.65f);
+	screenShader.setFloat("grainStrength", 0.035f);
+	screenShader.setFloat("saturation", 0.65f);
+	screenShader.setFloat("contrast", 1.25f);
+	screenShader.setFloat("brightness", -0.03f);
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
@@ -631,9 +654,12 @@ static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned in
 	glBindVertexArray(quadVAO);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	glBindVertexArray(0);
+
+	glEnable(GL_DEPTH_TEST);
 }
 
 static bool keyPressedOnce(GLFWwindow* window, int key) {
+
     static bool wasDown[GLFW_KEY_LAST + 1] = { false };
     bool down = glfwGetKey(window, key) == GLFW_PRESS;
     bool pressed = down && !wasDown[key];
