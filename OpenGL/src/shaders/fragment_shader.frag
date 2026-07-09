@@ -3,21 +3,43 @@
 out vec4 FragColor;
 
 in vec2 TexCoords;
+in vec3 FragPos;
+in vec3 Normal;
 
 uniform sampler2D texture_diffuse1;
 
 uniform vec3 ambientColor;
 
-void main(){    
-	vec4 texColor = texture(texture_diffuse1, TexCoords);
+uniform vec3 lightPos;
+uniform vec3 lightColor;
+uniform float lightIntensity;
+uniform float lightRadius;
 
-	if(texColor.a < 0.05) 
+void main() {    
+	
+	vec4 texSample = texture(texture_diffuse1, TexCoords);
+	
+	if (texSample.a < 0.05)
 		discard;
+	
+	vec3 texColor = texSample.rgb;
 
-	vec3 litColor = texColor.rgb * ambientColor;
+	vec3 normal = normalize(Normal);
 
-	FragColor = vec4(litColor, texColor);
+	vec3 ambient = ambientColor * texColor;
 
+	vec3 toLight = lightPos - FragPos;
+	float distanceToLight = length(toLight);
+	vec3 lightDir = normalize(toLight);
 
-	//FragColor = texture(texture_diffuse1, TexCoords);
+	float diff = max(dot(normal, lightDir), 0.0);
+
+	float attenuation = 1.0 - smoothstep(0.0, lightRadius, distanceToLight);
+	attenuation = clamp(attenuation, 0.0, 1.0);
+
+	vec3 diffuse = diff * lightColor * lightIntensity * attenuation * texColor;
+
+	vec3 result = ambient + diffuse;
+
+	FragColor = vec4(result, texSample.a);
 }

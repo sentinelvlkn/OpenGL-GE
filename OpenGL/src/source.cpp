@@ -611,7 +611,12 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 
 	shader.use();
 
-	shader.setVec3("ambientColor", glm::vec3(0.35f, 0.35f, 0.38f));	
+	shader.setVec3("ambientColor", glm::vec3(0.35f, 0.35f, 0.38f));
+
+	shader.setVec3("lightPos", player.position + glm::vec3(0.0f, 2.0f, 0.0f));
+	shader.setVec3("lightColor", glm::vec3(1.0f, 0.78f, 0.48f));
+	shader.setFloat("lightIntensity", 5.0f);
+	shader.setFloat("lightRadius", 15.0f);
 
 	glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH/(float)HEIGHT, 0.1f, 100.0f);
 	glm::mat4 view = camera.getViewMatrix();
