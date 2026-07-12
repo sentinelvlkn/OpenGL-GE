@@ -215,7 +215,8 @@ def export_room_json():
 
     if USE_TEMP_DOOR:
         doors.extend(TEMP_DOORS)
-
+    
+    #--interactions--
     interactions = []
 
     for obj in bpy.data.objects:
@@ -250,6 +251,58 @@ def export_room_json():
 
             interactions.append(interaction)
 
+    #--lights--
+
+    lights = []
+
+    def parse_color_prop(value, default=(1.0, 0.75, 0.45)):
+        if value is None:
+            return list(default)
+
+        if isinstance(value, str):
+            parts = value.replace(",", " ").split()
+            if len(parts) >= 3:
+                try:
+                    return [
+                        round_float(parts[0]),
+                        round_float(parts[1]),
+                        round_float(parts[2])
+                    ]
+                except ValueError:
+                    return list(default)
+
+            return list(default)
+
+        try:
+            if len(value) >= 3:
+                return [
+                    round_float(value[0]),
+                    round_float(value[1]),
+                    round_float(value[2])
+                ]
+        except Exception:
+            pass
+
+        return list(default)
+
+    for obj in bpy.data.objects:
+        if not obj.name.startswith("Light_"):
+            continue
+
+        pos = obj.matrix_world.translation
+
+        color = parse_color_prop(obj.get("color", None))
+        intensity = float(obj.get("intensity", 4.0))
+        radius = float(obj.get("radius", 14.0))
+        flicker = bool(obj.get("flicker", False))
+
+        lights.append({
+            "position": vec3(pos),
+            "color": color,
+            "intensity": round_float(intensity),
+            "radius": round_float(radius),
+            "flicker": flicker
+        })   
 
     #-------------- final json--------------
     room_json = {
@@ -259,7 +312,8 @@ def export_room_json():
         "cameras": cameras,
         "colliders": colliders,
         "doors": doors,
-        "interactions": interactions 
+        "interactions": interactions,
+        "lights": lights
     }
 
     # Save next to the .blend file if the .blend is saved
