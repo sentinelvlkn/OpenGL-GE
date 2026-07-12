@@ -5,6 +5,7 @@
 #include "Camera.h"
 #include "AABB.h"
 #include "Interaction.h"
+#include "Light.h"
 #include "thirdparty/json.hpp"
 #include <iostream>
 
@@ -37,6 +38,7 @@ struct Room {
 	std::vector<AABB> colliders;
 	std::vector<DoorTrigger> doors;
 	std::vector<Interaction> interactions;
+	std::vector<PointLight> lights;
 };
 
 

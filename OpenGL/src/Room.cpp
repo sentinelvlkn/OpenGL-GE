@@ -1,5 +1,6 @@
 #include "Room.h"
 #include "Interaction.h"
+#include "Light.h"
 #include <fstream>
 #include <stdexcept>
 #include <iostream>
@@ -143,7 +144,28 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 			room.interactions.push_back(interaction);
 		}
 	}
-	
+
+	if (j.contains("lights")) {
+		if (!j.at("lights").is_array())
+	        throw std::runtime_error("lights is not an array: " + jsonPath);
+
+		for (const auto& jl : j.at("lights")) {
+		        PointLight light;
+
+		        glm::vec3 posB = readVec3(jl.at("position"), "light position");
+		        light.position = convertBlenderCoords(posB);
+
+			if (jl.contains("color")) {
+				light.color = readVec3(jl.at("color"), "light color");
+        		}
+
+		        light.intensity = jl.value("intensity", 3.0f);
+		        light.radius = jl.value("radius", 8.0f);
+		        light.flicker = jl.value("flicker", false);
+
+	        room.lights.push_back(light);
+    		}
+	}	
 
 	if (room.cameras.empty())
 		throw std::runtime_error("Room has 0 cameras: " + jsonPath);

@@ -20,6 +20,7 @@
 #include <glm/trigonometric.hpp>
 #include <iostream>
 #include <memory>
+#include <unordered_map>
 #include "include/test_vertices.h"
 
 static bool circleAABBIntersectXZ(const glm::vec3& pos, float radius, const AABB& box);
@@ -27,13 +28,15 @@ static glm::vec3 getMoveDirInput(GLFWwindow* window, const glm::vec3& camForward
 static void updatePlayerMovement(GLFWwindow* window, Player& player, const Camera& camera, const Room& room, float deltaTime);
 static void updateFade(float deltaTime);
 static void updateRoomCamera(Room& room, const Player& player, Camera& camera);
-static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& roomModel, Model& playerModel, const Player& player, Camera& camera);
+static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& roomModel, Model& playerModel, const Player& player, const Room& room, Camera& camera);
 static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned int textureColorBuffer, float time);
 static bool keyPressedOnce(GLFWwindow* window, int key);
 static const DoorTrigger* getDoorInRange(const Room& room, const glm::vec3& playerPos);
 static Interaction* getInteractionInRange(Room& room, const glm::vec3& playerPos);
 static void runInteraction(Interaction& interaction);
 static unsigned int loadTexture2D(const char* path);
+static std::unordered_map<std::string, std::unique_ptr<Model>> roomModelCache;
+static Model& getRoomModel(const Room& room);
 
 int WIDTH = 800;
 int HEIGHT = 600;
@@ -145,9 +148,11 @@ int main()
 
 
 
-	std::unique_ptr<Model> testRoomModel = std::make_unique<Model>(
+	/*std::unique_ptr<Model> testRoomModel = std::make_unique<Model>(
 		FileSystem::pathFromRoot(testRoom.modelPath).c_str()
-	);
+	);*/
+	Model* testRoomModel = nullptr;
+	testRoomModel = &getRoomModel(testRoom);
 
 	Model playerModel(
 		FileSystem::pathFromRoot("src/models/test_character/test_character.obj").c_str()
@@ -247,10 +252,10 @@ int main()
     		if (transitioning && !fadeIn && fade >= 1.0f) {
        			try {
 				testRoom = loadRoomFromJson(FileSystem::pathFromRoot(pendingRoomJson).c_str());
-			
-				testRoomModel = std::make_unique<Model>(
+				testRoomModel = &getRoomModel(testRoom);
+				/*testRoomModel = std::make_unique<Model>(
 					FileSystem::pathFromRoot(testRoom.modelPath).c_str()
-				);
+				);*/
 				
 				player.position = pendingSpawn;
 				roomCameraSwitch(testRoom, player.position);
@@ -331,8 +336,10 @@ int main()
         		lastCam = testRoom.activeCamera;
 		}
 
-		renderSceneToFBO(framebuffer, shader, *testRoomModel, playerModel, player, camera);
+		renderSceneToFBO(framebuffer, shader, *testRoomModel, playerModel, player, testRoom, camera);
 		renderScreen(quadVAO, screenShader, textureColorBuffer, time);
+		
+		
 
 		if (noteOpen && activeNoteTexture != 0) {
 			glDisable(GL_DEPTH_TEST);
@@ -603,35 +610,83 @@ static void updateRoomCamera(Room& room, const Player& player, Camera& camera){
 	applyRoomCamera(room, camera);
 }
 
-static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& roomModel, Model& playerModel, const Player& player, Camera& camera){
+static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& roomModel, Model& playerModel, const Player& player, const Room& room, Camera& camera){
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	glViewport(0, 0, WIDTH, HEIGHT);
+
 	glEnable(GL_DEPTH_TEST);
+	glDepthMask(GL_TRUE);
+
 	glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	shader.use();
 
-	shader.setVec3("ambientColor", glm::vec3(0.35f, 0.35f, 0.38f));
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	shader.setInt("texture_diffuse1", 0);
 
-	shader.setVec3("lightPos", player.position + glm::vec3(0.0f, 2.0f, 0.0f));
-	shader.setVec3("lightColor", glm::vec3(1.0f, 0.78f, 0.48f));
-	shader.setFloat("lightIntensity", 5.0f);
-	shader.setFloat("lightRadius", 15.0f);
+	//glm;:vec3 ambientColor = glm::vec3(0.10f, 0.10f, 0.12f); 
+	glm::vec3 ambientColor = glm::vec3(0.18f, 0.18f, 0.20f); 
+	//glm::vec3 ambientColor = glm::vec3(0.25f, 0.25f, 0.28f); 
+
+	shader.setVec3("ambientColor", ambientColor);
+	
+	glm::vec3 finalLightPos = player.position + glm::vec3(0.0f, 2.0f, 0.0f);
+	glm::vec3 finalLightColor = glm::vec3(1.0f, 0.75f, 0.45f);
+	float finalLightIntensity = 3.0f;
+	float finalLightRadius = 10.0f;
+	
+	if (!room.lights.empty()) {
+		const PointLight& light = room.lights[0];
+	
+		finalLightPos = light.position;
+		finalLightColor = light.color;
+		finalLightIntensity = light.intensity;
+		finalLightRadius = light.radius;
+
+		if (light.flicker) {
+			float t = static_cast<float>(glfwGetTime());
+			finalLightIntensity *= 0.85f + 0.15f * sin(t * 18.0f);
+		}
+				
+	}
+	
+	shader.setVec3("lightPos", finalLightPos);
+	shader.setVec3("lightColor", finalLightColor);
+	shader.setFloat("lightIntensity", finalLightIntensity);
+	shader.setFloat("lightRadius", finalLightRadius);
+	
+	static int frameCounter = 0;
+	frameCounter++;
+
+	if (frameCounter % 120 == 0) {
+	    std::cout << "Rendering room: " << room.name
+        	      << " lights: " << room.lights.size() << "\n";
+	}
 
 	glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH/(float)HEIGHT, 0.1f, 100.0f);
 	glm::mat4 view = camera.getViewMatrix();
 	shader.setMat4("projection", projection);
 	shader.setMat4("view", view);
 
+	glActiveTexture(GL_TEXTURE0);
+	shader.setInt("texture_diffuse1", 0);
+
 	glm::mat4 model = glm::mat4(1.0f);
         //model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0,1,0));
 	shader.setMat4("model", model);
 	roomModel.Draw(shader);
+
+	glActiveTexture(GL_TEXTURE0);
+	shader.setInt("texture_diffuse1", 0);
 	
 	glm::mat4 playerMo = glm::mat4(1.0f);
 	playerMo = glm::translate(playerMo, player.position);
 	shader.setMat4("model", playerMo);
 	playerModel.Draw(shader);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned int textureColorBuffer, float time) {
@@ -639,6 +694,7 @@ static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned in
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, WIDTH, HEIGHT);
 	glDisable(GL_DEPTH_TEST);
+	glDepthMask(GL_FALSE);
 
 	glClearColor(1,1,1,1);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -650,19 +706,22 @@ static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned in
 	screenShader.setFloat("fade" , fade);
 	screenShader.setFloat("time", time);
 
-	screenShader.setFloat("vignetteStrength", 0.65f);
-	screenShader.setFloat("grainStrength", 0.035f);
-	screenShader.setFloat("saturation", 0.65f);
-	screenShader.setFloat("contrast", 1.25f);
-	screenShader.setFloat("brightness", -0.03f);
+	screenShader.setFloat("vignetteStrength", 0.0f);
+	screenShader.setFloat("grainStrength", 0.0f);
+	screenShader.setFloat("saturation", 1.0f);
+	screenShader.setFloat("contrast", 1.0f);
+	screenShader.setFloat("brightness", 0.0f);
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
 
 	glBindVertexArray(quadVAO);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
+	
 	glBindVertexArray(0);
+	glBindTexture(GL_TEXTURE_2D, 0);
 
+	glDepthMask(GL_TRUE);
 	glEnable(GL_DEPTH_TEST);
 }
 
@@ -794,7 +853,17 @@ static unsigned int loadTexture2D(const char* path) {
 	return textureID;
 }
 
+static Model& getRoomModel(const Room& room){
+	std::string path = FileSystem::pathFromRoot(room.modelPath);
 
+	auto it = roomModelCache.find(path);
+	if (it == roomModelCache.end()) {
+		roomModelCache[path] = std::make_unique<Model>(path.c_str());
+		return *roomModelCache[path];
+	}
+
+	return *it->second;
+}
 
 
 
