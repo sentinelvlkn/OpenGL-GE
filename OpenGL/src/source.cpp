@@ -627,10 +627,10 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 	shader.setInt("texture_diffuse1", 0);
 
 	//glm;:vec3 ambientColor = glm::vec3(0.10f, 0.10f, 0.12f); 
-	glm::vec3 ambientColor = glm::vec3(0.18f, 0.18f, 0.20f); 
+	//glm::vec3 ambientColor = glm::vec3(0.18f, 0.18f, 0.20f); 
 	//glm::vec3 ambientColor = glm::vec3(0.25f, 0.25f, 0.28f); 
 
-	shader.setVec3("ambientColor", ambientColor);
+	shader.setVec3("ambientColor", room.ambientColor);
 	
 	const int MAX_POINT_LIGHTS = 8;
 

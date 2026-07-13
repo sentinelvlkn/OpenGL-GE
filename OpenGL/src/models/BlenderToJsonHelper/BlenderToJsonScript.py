@@ -22,6 +22,8 @@ WALL_THICKNESS = 0.115
 # Optional: set True if you want one hardcoded test door
 USE_TEMP_DOOR = False
 
+AMBIENT_COLOR = [0.12, 0.12, 0.14]
+
 TEMP_DOORS = [
     {
         "min": [-1.0, -1.0, 0.0],
@@ -119,6 +121,66 @@ def make_perimeter_colliders_from_bounds(min_v, max_v, thickness):
             "max": [round_float(x1), round_float(y1), round_float(z1)]
         }
     ]
+
+def parse_color_prop(value, default=(1.0, 0.75, 0.45)):
+        if value is None:
+            return list(default)
+
+        if isinstance(value, str):
+            parts = value.replace(",", " ").split()
+            if len(parts) >= 3:
+                try:
+                    return [
+                        round_float(parts[0]),
+                        round_float(parts[1]),
+                        round_float(parts[2])
+                    ]
+                except ValueError:
+                    return list(default)
+
+            return list(default)
+
+        try:
+            if len(value) >= 3:
+                return [
+                    round_float(value[0]),
+                    round_float(value[1]),
+                    round_float(value[2])
+                ]
+        except Exception:
+            pass
+
+        return list(default)
+
+def get_scene_ambient(default=(0.12, 0.12, 0.14)):
+    value = bpy.context.scene.get("ambientColor", None)
+
+    if value is None:
+        return list(default)
+
+    if isinstance(value, str):
+        parts = value.replace(",", " ").split()
+        if len(parts) >= 3:
+            try:
+                return [
+                    round_float(parts[0]),
+                    round_float(parts[1]),
+                    round_float(parts[2])
+                ]
+            except ValueError:
+                return list(default)
+
+    try:
+        if len(value) >= 3:
+            return[
+                round_float(value[0]),
+                round_float(value[1]),
+                round_float(value[2])
+            ]
+    except Exception:
+        pass
+
+    return list(default)
 
 #export
 
@@ -255,36 +317,6 @@ def export_room_json():
 
     lights = []
 
-    def parse_color_prop(value, default=(1.0, 0.75, 0.45)):
-        if value is None:
-            return list(default)
-
-        if isinstance(value, str):
-            parts = value.replace(",", " ").split()
-            if len(parts) >= 3:
-                try:
-                    return [
-                        round_float(parts[0]),
-                        round_float(parts[1]),
-                        round_float(parts[2])
-                    ]
-                except ValueError:
-                    return list(default)
-
-            return list(default)
-
-        try:
-            if len(value) >= 3:
-                return [
-                    round_float(value[0]),
-                    round_float(value[1]),
-                    round_float(value[2])
-                ]
-        except Exception:
-            pass
-
-        return list(default)
-
     for obj in bpy.data.objects:
         if not obj.name.startswith("Light_"):
             continue
@@ -304,6 +336,10 @@ def export_room_json():
             "flicker": flicker
         })   
 
+    #--ambient color--
+
+    ambientColor = get_scene_ambient()
+
     #-------------- final json--------------
     room_json = {
         "name": ROOM_NAME,
@@ -313,7 +349,8 @@ def export_room_json():
         "colliders": colliders,
         "doors": doors,
         "interactions": interactions,
-        "lights": lights
+        "lights": lights,
+        "ambientColor": ambientColor
     }
 
     # Save next to the .blend file if the .blend is saved

@@ -20,16 +20,21 @@ Set ROOM_WALLS_OBJECT to match the mesh used to calculate outer wall bounds.
 e.g ROOM_WALLS_OBJECT = "room_walls"
 
 To add lights in a room:
-1.Add point light: Add -> Light -> Point
-2.Rename it, e.g Light_01
-3.Position it 
-4.Add custom properties, e.g:
+1. Add point light: Add -> Light -> Point
+2. Rename it, e.g Light_01
+3. Position it 
+4. Add custom properties, e.g:
 	color = 1.0, 0.75, 0.45
 	intensity = 4.0
 	radius = 14.0
 	flicker = false
 (if you do not add custom properties the script will refer to default values)
 
+To set the ambient color in a room:
+1. Go to Scene and add a custom property (can be a float array)
+2. Name it "ambientColor"
+3. Set the values
+(if you do not add custom ambient color the script will use default values)
 
 
 Naming convention in Blender for my game engine:
@@ -52,6 +57,11 @@ Required:
 		Interact_TestNote
 		Interact_WallMessage
 		Interact_* and etc.
+	
+	Lights:
+		Light_01
+		Light_02
+		Light_Hallway
 
 How to set door target room (fov) in Blender:
 	Select door cube/object and:
@@ -126,6 +136,7 @@ Helper objects that do not take part in the OBJ export:
 -colliders (e.g Col_Block)
 -player spawn (e.g PlayerSpawn)
 -lights (e.g Light_01)
+-ambient color (custom property)
 
 Helper objects are used by the Blender-to-JSON script only!
 
@@ -219,6 +230,8 @@ The script should export helper data into the room JSON:
 - extra Col_* colliders
 - Door_* triggers
 - Interact_* triggers
+- Light_* lights
+- ambientColor
 
 The helper coordinates are Blender coordinates.
 The C++ room loader converts them into engine coordinates.

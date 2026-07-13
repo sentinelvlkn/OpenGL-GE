@@ -170,6 +170,20 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 	if (room.cameras.empty())
 		throw std::runtime_error("Room has 0 cameras: " + jsonPath);
 
+	if (j.contains("ambientColor")) {
+		room.ambientColor = readVec3(j.at("ambientColor"), "ambientColor");
+
+		std::cout << "Loaded ambientColor for " << room.name << ": "
+              	        << room.ambientColor.x << ", "
+			<< room.ambientColor.y << ", "
+			<< room.ambientColor.z << "\n";	
+	}
+	else {
+		room.ambientColor = glm::vec3(0.12f, 0.12f, 0.14f);
+		std::cout << "No ambientColor in " << room.name
+		              << ", using default.\n";
+	}
+
 
 	return room;
 }

@@ -34,6 +34,8 @@ struct Room {
 	int activeCamera = 0;
 
 	glm::vec3 playerSpawn;
+	
+	glm::vec3 ambientColor = glm::vec3(0.12f, 0.12f, 0.14f);
 
 	std::vector<AABB> colliders;
 	std::vector<DoorTrigger> doors;

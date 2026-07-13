@@ -2,9 +2,9 @@
   "name": "test_room02",
   "model": "src/models/test_room02/test_room02.obj",
   "playerSpawn": [
-    -1.35804,
-        -1.06828,
-        4.96581
+    4.88757,
+    1.11574,
+    6.00622
   ],
   "cameras": [
     {
@@ -101,22 +101,11 @@
       ]
     }
   ],
-  "interactions": [
-    {
-      "id": "test_note",
-      "type": "note",
-      "min": [
-        -1.35804,
-        -1.06828,
-        4.96581
-      ],
-      "max": [
-        0.64196,
-        0.93172,
-        6.96581
-      ],
-      "asset": "src/ui/notes/test_note.png",
-      "repeatable": true
-    }
+  "interactions": [],
+  "lights": [],
+  "ambientColor": [
+    0.04,
+    0.04,
+    0.05
   ]
 }
