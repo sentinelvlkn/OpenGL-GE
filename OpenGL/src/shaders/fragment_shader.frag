@@ -10,10 +10,17 @@ uniform sampler2D texture_diffuse1;
 
 uniform vec3 ambientColor;
 
-uniform vec3 lightPos;
-uniform vec3 lightColor;
-uniform float lightIntensity;
-uniform float lightRadius;
+#define MAX_POINT_LIGHTS 8
+
+struct PointLight {
+	vec3 position;
+	vec3 color;
+	float intensity;
+	float radius;
+};
+
+uniform int numPointLights;
+uniform PointLight pointLights[MAX_POINT_LIGHTS];
 
 void main() {    
 	
@@ -27,35 +34,28 @@ void main() {
 	if (length(texColor) < 0.01)
 		texColor = vec3(1.0);
 
-
-	vec3 normal = Normal;
-
-	if (length(normal) < 0.001)
-		normal = vec3(0.0, 1.0, 0.0);
-	else
-		normal = normalize(normal);
-
 	vec3 ambient = ambientColor * texColor;
 
-	vec3 toLight = lightPos - FragPos;
-	float distanceToLight = length(toLight);
-	
-	vec3 lightDir = vec3(0.0, 1.0, 0.0);
-	if (distanceToLight > 0.0001)
-		lightDir = toLight / distanceToLight;
+	vec3 totalDiffuse = vec3(0.0);
 
-	//float diff = max(dot(normal, lightDir), 0.0);
-	//float diff = abs(dot(normal, lightDir));
-	float diff = 1.0;
-	
-	float radius = max(lightRadius, 0.001);
-	float attenuation = 1.0 - smoothstep(0.0, radius, distanceToLight);
-	attenuation = clamp(attenuation, 0.0, 1.0);
+	for (int i = 0; i < numPointLights; ++i) {
+		vec3 toLight = pointLights[i].position - FragPos;
+		float distanceToLight = length(toLight);
 
-	vec3 diffuse = diff * lightColor * lightIntensity * attenuation * texColor;
+		float radius = max(pointLights[i].radius, 0.001);
+		float attenuation = 1.0 - smoothstep(0.0, radius, distanceToLight);
+		attenuation = clamp(attenuation, 0.0, 1.0);
+		
+		//temporary diffuse value
+		float diff = 1.0;
 
-	vec3 result = ambient + diffuse;
+		vec3 diffuse = diff * pointLights[i].color * pointLights[i].intensity * attenuation * texColor;
+
+		totalDiffuse += diffuse;
+	}
+
+	vec3 result = ambient + totalDiffuse;
 	result = clamp(result, 0.0, 1.0);
-
+	
 	FragColor = vec4(result, texSample.a);
 }

@@ -632,38 +632,56 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 
 	shader.setVec3("ambientColor", ambientColor);
 	
-	glm::vec3 finalLightPos = player.position + glm::vec3(0.0f, 2.0f, 0.0f);
-	glm::vec3 finalLightColor = glm::vec3(1.0f, 0.75f, 0.45f);
-	float finalLightIntensity = 3.0f;
-	float finalLightRadius = 10.0f;
-	
-	if (!room.lights.empty()) {
-		const PointLight& light = room.lights[0];
-	
-		finalLightPos = light.position;
-		finalLightColor = light.color;
-		finalLightIntensity = light.intensity;
-		finalLightRadius = light.radius;
+	const int MAX_POINT_LIGHTS = 8;
 
-		if (light.flicker) {
-			float t = static_cast<float>(glfwGetTime());
-			finalLightIntensity *= 0.85f + 0.15f * sin(t * 18.0f);
-		}
+	int numLights = 0;
+
+	if (!room.lights.empty()) {
+		numLights = std::min((int)room.lights.size(), MAX_POINT_LIGHTS);
+
+		for (int i=0; i < numLights; ++i) {
+			const PointLight& light = room.lights[i];
+
+			float intensity = light.intensity;
+			
+			if (light.flicker) {
+				float t = static_cast<float>(glfwGetTime());
 				
+				//temporary flicker
+				intensity *= 0.85f + 0.15f * sin(t * 20.0f + i * 3.0f);
+			}
+
+			std::string base = "pointLights[" + std::to_string(i) +"]";
+
+			shader.setVec3(base + ".position", light.position);
+			shader.setVec3(base + ".color", light.color);
+			shader.setFloat(base + ".intensity", light.intensity);
+			shader.setFloat(base + ".radius", light.radius);
+		}
 	}
+	else {
+		//if there are no lights in the room - a light will be fixed to the player
+		numLights = 1;
+		
+		std::string base = "pointLights[0]";
+
+		shader.setVec3(base + ".position", player.position + glm::vec3(0.0f, 2.0f, 0.0f));
+		shader.setVec3(base + ".color", glm::vec3(1.0f, 0.75f, 0.45f));
+		shader.setFloat(base + ".intensity", 3.0f);
+		shader.setFloat(base + ".radius", 10.0f);
+
+	}
+		
+	shader.setInt("numPointLights", numLights);
 	
-	shader.setVec3("lightPos", finalLightPos);
-	shader.setVec3("lightColor", finalLightColor);
-	shader.setFloat("lightIntensity", finalLightIntensity);
-	shader.setFloat("lightRadius", finalLightRadius);
-	
+	/* snippet to display number if active point lights 
 	static int frameCounter = 0;
 	frameCounter++;
 
 	if (frameCounter % 120 == 0) {
 	    std::cout << "Rendering room: " << room.name
         	      << " lights: " << room.lights.size() << "\n";
-	}
+	}*/
 
 	glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH/(float)HEIGHT, 0.1f, 100.0f);
 	glm::mat4 view = camera.getViewMatrix();
