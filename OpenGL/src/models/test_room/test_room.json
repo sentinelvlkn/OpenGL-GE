@@ -118,9 +118,9 @@
       ],
       "targetRoom": "src/models/test_room02/test_room02.json",
       "targetSpawn": [
-        0.0,
-        0.0,
-        5.0
+        4.88757,
+        1.11574,
+        6.00622
       ]
     }
   ],

@@ -101,8 +101,48 @@
       ]
     }
   ],
-  "interactions": [],
-  "lights": [],
+  "interactions": [
+    {
+      "id": "test_note",
+      "type": "note",
+      "min": [
+        -1.35804,
+        -1.06828,
+        5.38113
+      ],
+      "max": [
+        0.64196,
+        0.93172,
+        7.38113
+      ],
+      "repeatable": true,
+      "asset": "src/ui/notes/test_note.png"
+    }
+  ],
+  "lights": [
+    {
+      "position": [
+        -2.22779,
+        7.32751,
+        6.44035
+      ],
+      "color": [
+        0.45,
+        0.58,
+        1.0
+      ],
+      "intensity": 10.0,
+      "radius": 25.0,
+      "flicker": {
+        "enabled": true,
+        "type": "lightning",
+        "frequency": 0.25,
+        "strength": 1.0,
+        "randomness": 1.0,
+        "threshold": 0.93
+      }
+    }
+  ],
   "ambientColor": [
     0.04,
     0.04,

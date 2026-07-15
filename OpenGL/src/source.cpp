@@ -37,6 +37,9 @@ static void runInteraction(Interaction& interaction);
 static unsigned int loadTexture2D(const char* path);
 static std::unordered_map<std::string, std::unique_ptr<Model>> roomModelCache;
 static Model& getRoomModel(const Room& room);
+static float hashFloat(float x);
+static float noise1D(float x);
+static float calculateFlickerMultiplier(const PointLight& light, float time, int lightIndex);
 
 int WIDTH = 800;
 int HEIGHT = 600;
@@ -642,20 +645,16 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 		for (int i=0; i < numLights; ++i) {
 			const PointLight& light = room.lights[i];
 
+			float t = static_cast<float>(glfwGetTime());
+
 			float intensity = light.intensity;
-			
-			if (light.flicker) {
-				float t = static_cast<float>(glfwGetTime());
-				
-				//temporary flicker
-				intensity *= 0.85f + 0.15f * sin(t * 20.0f + i * 3.0f);
-			}
+			intensity *= calculateFlickerMultiplier(light, t, i);
 
 			std::string base = "pointLights[" + std::to_string(i) +"]";
 
 			shader.setVec3(base + ".position", light.position);
 			shader.setVec3(base + ".color", light.color);
-			shader.setFloat(base + ".intensity", light.intensity);
+			shader.setFloat(base + ".intensity", intensity);
 			shader.setFloat(base + ".radius", light.radius);
 		}
 	}
@@ -883,5 +882,69 @@ static Model& getRoomModel(const Room& room){
 	return *it->second;
 }
 
+static float hashFloat(float x) {
+	return glm::fract(sin(x * 12.9898f) * 43758.5453f);
+}
 
+static float noise1D(float x) {
+	float i = floor(x);
+	float f = glm::fract(x);
+
+	float a = hashFloat(i);
+	float b = hashFloat(i + 1.0f);
+
+	float u = f * f * (3.0f - 2.0f * f);
+
+	return glm::mix(a, b, u);
+}
+
+static float calculateFlickerMultiplier(const PointLight& light, float time, int lightIndex) {
+	if (!light.flicker)
+		return 1.0f;
+
+	float freq = glm::max(light.flickerFrequency, 0.001f);
+	float strength = glm::clamp(light.flickerStrength, 0.0f, 1.0f);
+	float randomness = glm::clamp(light.flickerRandomness, 0.0f, 1.0f);
+
+	float phase = lightIndex * 17.31f;
+	float x = time * freq + phase;
+
+	if (light.flickerType == "fluorescent") { //fast small pulse like worn out halogen tubes
+		float pulse = 0.5f + 0.5f * sin(x * 6.28318f);
+
+		float noise = noise1D(x * 2.7f) * 2.0f - 1.0f;
+
+		float variation = (pulse - 0.5f) * strength + noise * strength * randomness;
+
+		return glm::clamp(1.0f + variation, 0.15f, 1.35f);
+	}
+
+	if (light.flickerType == "tungsten") { //irregular voltage incadescnet
+		float slow = sin(x * 6.283f) * 0.5f;
+
+		float n = noise1D(x * 1.35f) * 2.0f - 1.0f;
+
+		float variation = slow * strength * 0.45f + n * strength * randomness;
+
+		return glm::clamp(1.0f + variation, 0.25f, 1.25f);
+	}
+
+	if (light.flickerType == "lightning") { //thunderstorm, occasional flash
+		float n = noise1D(x);
+
+		if (n < light.flickerThreshold)
+			return 0.0f;
+
+		float flashAmount = (n - light.flickerThreshold) / glm::max(1.0f - light.flickerThreshold, 0.001f);
+
+		float strobe = 0.65f + 0.35f * sin(time * 80.0f + phase); // rapid pulse after initial lightning to simulate
+										// several flashes
+
+		return glm::clamp(flashAmount * strobe * strength * 4.0f, 0.0f, 4.0f);
+	}
+	
+	//default sine flicker
+	float simple = 0.85f + 0.15f * sin(time * freq + phase);
+	return glm::mix(1.0f, simple, strength);
+}
 

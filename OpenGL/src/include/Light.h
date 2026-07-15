@@ -11,4 +11,12 @@ struct PointLight {
 	float radius = 8.0f;
 
 	bool flicker = false;
+
+	std::string flickerType = "none";
+
+	float flickerFrequency = 8.0f;
+	float flickerStrength = 0.2f;
+	float flickerRandomness = 0.0f;
+
+	float flickerThreshold = 0.85f; //for thunderstorm flashes
 };

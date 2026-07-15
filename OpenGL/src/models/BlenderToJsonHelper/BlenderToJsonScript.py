@@ -326,16 +326,37 @@ def export_room_json():
         color = parse_color_prop(obj.get("color", None))
         intensity = float(obj.get("intensity", 4.0))
         radius = float(obj.get("radius", 14.0))
-        flicker = bool(obj.get("flicker", False))
-
-        lights.append({
+        
+        flicker_enabled = bool(obj.get("flicker", False))
+        flicker_type = str(obj.get("flickerType", "sine"))
+        flicker_frequency = float(obj.get("flickerFrequency", 8.0))
+        flicker_strength = float(obj.get("flickerStrength", 0.2))
+        flicker_randomness = float(obj.get("flickerRandomness", 0.0))
+        flicker_threshold = float(obj.get("flickerThreshold", 0.85))
+        
+        light_json = {
             "position": vec3(pos),
             "color": color,
             "intensity": round_float(intensity),
-            "radius": round_float(radius),
-            "flicker": flicker
-        })   
+            "radius": round_float(radius)
+        }
 
+        if flicker_enabled:
+            light_json["flicker"] = {
+                "enabled": True,
+                "type": flicker_type,
+                "frequency": round_float(flicker_frequency),
+                "strength": round_float(flicker_strength),
+                "randomness": round_float(flicker_randomness),
+                "threshold": round_float(flicker_threshold)
+            }
+        else:
+            light_json["flicker"] = {
+                "enabled": False
+            }
+
+        lights.append(light_json)
+       
     #--ambient color--
 
     ambientColor = get_scene_ambient()
