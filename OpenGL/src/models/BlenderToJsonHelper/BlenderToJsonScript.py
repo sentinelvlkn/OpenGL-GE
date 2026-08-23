@@ -321,12 +321,28 @@ def export_room_json():
         if not obj.name.startswith("Light_"):
             continue
 
+        if obj.name.endswith("_Target"):
+            continue
+
+        light_type = str(obj.get("lightType", "point"))
+
+        target_name = obj.name + "_Target"
+        target_obj = get_obj(target_name)
+        if target_obj is None:
+            print(f"WARNING: {obj.name} has no matching target empty named {target_name}")
+            target = vec3(pos)
+        else:
+            target = vec3(target_obj.matrix_world.translation)
+
         pos = obj.matrix_world.translation
 
         color = parse_color_prop(obj.get("color", None))
         intensity = float(obj.get("intensity", 4.0))
         radius = float(obj.get("radius", 14.0))
         
+        inner_cutoff = float(obj.get("innerCutoff", 12.0))
+        outer_cutoff = float(obj.get("outerCutoff", 28.0))
+
         flicker_enabled = bool(obj.get("flicker", False))
         flicker_type = str(obj.get("flickerType", "sine"))
         flicker_frequency = float(obj.get("flickerFrequency", 8.0))
@@ -335,11 +351,17 @@ def export_room_json():
         flicker_threshold = float(obj.get("flickerThreshold", 0.85))
         
         light_json = {
+            "type": light_type,
             "position": vec3(pos),
             "color": color,
             "intensity": round_float(intensity),
             "radius": round_float(radius)
         }
+
+        if light_type == "spot":
+            light_json["target"] = target
+            light_json["innerCutoff"] = round_float(inner_cutoff)
+            light_json["outerCutoff"] = round_float(outer_cutoff)
 
         if flicker_enabled:
             light_json["flicker"] = {

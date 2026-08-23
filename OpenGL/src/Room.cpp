@@ -152,35 +152,48 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 		for (const auto& jl : j.at("lights")) {
 		        PointLight light;
 
+				light.type = jl.value("type", "point");
+
 		        glm::vec3 posB = readVec3(jl.at("position"), "light position");
 		        light.position = convertBlenderCoords(posB);
 
-			if (jl.contains("color")) {
-				light.color = readVec3(jl.at("color"), "light color");
+				if (jl.contains("target")) {
+					glm::vec3 targetB = readVec3(jl.at("target"), "light target");
+					light.target = convertBlenderCoords(targetB);
+				} 
+				else {
+					light.target = light.position + glm::vec3(0.0f, 0.0f, -1.0f);
+				}
+
+				if (jl.contains("color")) {
+					light.color = readVec3(jl.at("color"), "light color");
         		}
 
 		        light.intensity = jl.value("intensity", 3.0f);
 		        light.radius = jl.value("radius", 8.0f);
+
+				light.innerCutoff = jl.value("innerCutoff", 12.0f);
+				light.outerCutoff = jl.value("outerCutoff", 28.0f);
 		        
-			if (jl.contains("flicker")) {
-				const auto& jf = jl.at("flicker");
+				if (jl.contains("flicker")) {
+					const auto& jf = jl.at("flicker");
 
-				if (jf.is_boolean()) {
-					light.flicker = jf.get<bool>();
-					light.flickerType = light.flicker ? "sine" : "none";
+					if (jf.is_boolean()) {
+						light.flicker = jf.get<bool>();
+						light.flickerType = light.flicker ? "sine" : "none";
+					}
+					else if (jf.is_object()) {
+						light.flicker = jf.value("enabled", false);
+						light.flickerType = jf.value("type", "sine");
+
+						light.flickerFrequency = jf.value("frequency", 8.0f);
+						light.flickerStrength = jf.value("strength", 0.2f);
+						light.flickerRandomness = jf.value("randomness", 0.0f);
+						light.flickerThreshold = jf.value("threshold", 0.85f);
+					}
 				}
-				else if (jf.is_object()) {
-					light.flicker = jf.value("enabled", false);
-					light.flickerType = jf.value("type", "sine");
 
-					light.flickerFrequency = jf.value("frequency", 8.0f);
-					light.flickerStrength = jf.value("strength", 0.2f);
-					light.flickerRandomness = jf.value("randomness", 0.0f);
-					light.flickerThreshold = jf.value("threshold", 0.85f);
-				}
-			}
-
-	        room.lights.push_back(light);
+				room.lights.push_back(light);
     		}
 	}	
 

@@ -101,26 +101,10 @@
       ]
     }
   ],
-  "interactions": [
-    {
-      "id": "test_note",
-      "type": "note",
-      "min": [
-        -1.35804,
-        -1.06828,
-        5.38113
-      ],
-      "max": [
-        0.64196,
-        0.93172,
-        7.38113
-      ],
-      "repeatable": true,
-      "asset": "src/ui/notes/test_note.png"
-    }
-  ],
+  "interactions": [],
   "lights": [
     {
+      "type": "spot",
       "position": [
         -2.22779,
         7.32751,
@@ -133,6 +117,13 @@
       ],
       "intensity": 10.0,
       "radius": 25.0,
+      "target": [
+        -2.10997,
+        -0.06828,
+        1.14195
+      ],
+      "innerCutoff": 12.0,
+      "outerCutoff": 28.0,
       "flicker": {
         "enabled": true,
         "type": "lightning",

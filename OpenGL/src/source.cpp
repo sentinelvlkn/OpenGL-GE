@@ -40,6 +40,7 @@ static Model& getRoomModel(const Room& room);
 static float hashFloat(float x);
 static float noise1D(float x);
 static float calculateFlickerMultiplier(const PointLight& light, float time, int lightIndex);
+static void updateLightningDebugInput(GLFWwindow *window, float deltaTime);
 
 int WIDTH = 800;
 int HEIGHT = 600;
@@ -60,6 +61,13 @@ bool firstMouse = true;
 
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
+
+//light debug variables
+static float debugForcedLightningTimer = 0.0f;
+static bool debugLightningPreview = false; //keeps spotlight visible
+static bool debugDisableFlicker = false;  
+static bool debugPrintLightInformation = false;
+static bool debugSpotAsPoint = false; // turn spotlight to point light
 
 //for scene fade in and fade out
 float fade = 1.0f;
@@ -239,37 +247,38 @@ int main()
 
 	//main game loop
 	while (!glfwWindowShouldClose(window)) {
-    		float currentFrame = static_cast<float>(glfwGetTime());
-    		deltaTime = currentFrame - lastFrame;
-    		lastFrame = currentFrame;
+    	float currentFrame = static_cast<float>(glfwGetTime());
+    	deltaTime = currentFrame - lastFrame;
+    	lastFrame = currentFrame;
 
 		float time = static_cast<float>(glfwGetTime());
 
-    		deltaTime = glm::min(deltaTime, 1.0f/30.0f);
+    	deltaTime = glm::min(deltaTime, 1.0f/30.0f);
 
-    		processInput(window);
+    	processInput(window);
+		updateLightningDebugInput(window, deltaTime);
 
-    		updateFade(deltaTime);
+    	updateFade(deltaTime);
 
-    		// If fade-out finished, swap rooms
-    		if (transitioning && !fadeIn && fade >= 1.0f) {
-       			try {
-				testRoom = loadRoomFromJson(FileSystem::pathFromRoot(pendingRoomJson).c_str());
-				testRoomModel = &getRoomModel(testRoom);
-				/*testRoomModel = std::make_unique<Model>(
-					FileSystem::pathFromRoot(testRoom.modelPath).c_str()
-				);*/
+    	// If fade-out finished, swap rooms
+    	if (transitioning && !fadeIn && fade >= 1.0f) {
+       		try {
+			testRoom = loadRoomFromJson(FileSystem::pathFromRoot(pendingRoomJson).c_str());
+			testRoomModel = &getRoomModel(testRoom);
+			/*testRoomModel = std::make_unique<Model>(
+				FileSystem::pathFromRoot(testRoom.modelPath).c_str()
+			);*/
 				
-				player.position = pendingSpawn;
-				roomCameraSwitch(testRoom, player.position);
-        			applyRoomCamera(testRoom, camera);
+			player.position = pendingSpawn;
+			roomCameraSwitch(testRoom, player.position);
+        		applyRoomCamera(testRoom, camera);
 
-				fade = 1.0f;
-				fadeIn = false;
-				fadeOut = true;
+			fade = 1.0f;
+			fadeIn = false;
+			fadeOut = true;
 
-				transitioning = false;
-				pendingRoomJson.clear();
+			transitioning = false;
+			pendingRoomJson.clear();
 				
 			} catch (const std::exception& e) {
 
@@ -283,54 +292,53 @@ int main()
 				pendingRoomJson.clear();
 
 			}
-        		
-   	 	}
+   		}
 
-    		// Gameplay only when not transitioning
-    		if (!transitioning) {
-			bool pressedE = keyPressedOnce(window, GLFW_KEY_E);
+    	// Gameplay only when not transitioning
+    	if (!transitioning) {
+		bool pressedE = keyPressedOnce(window, GLFW_KEY_E);
 
-			if (messageOpen) {
-				if (pressedE){
-					messageOpen = false;
-					activeMessage.clear();
+		if (messageOpen) {
+			if (pressedE){
+				messageOpen = false;
+				activeMessage.clear();
 
-					noteOpen = false;
-					activeNoteImagePath.clear();
+				noteOpen = false;
+				activeNoteImagePath.clear();
 
-					if (activeNoteTexture != 0) {
-						glDeleteTextures(1, &activeNoteTexture);
-						activeNoteTexture = 0;
-					}
-
-					std::cout << "[MESSAGE CLOSED]\n";
+				if (activeNoteTexture != 0) {
+					glDeleteTextures(1, &activeNoteTexture);
+					activeNoteTexture = 0;
 				}
+
+				std::cout << "[MESSAGE CLOSED]\n";
 			}
-			else {
-	        		updatePlayerMovement(window, player, camera, testRoom, deltaTime);
+		}
+		else {
+	        	updatePlayerMovement(window, player, camera, testRoom, deltaTime);
 
-        			const DoorTrigger* door = getDoorInRange(testRoom, player.position);
+        		const DoorTrigger* door = getDoorInRange(testRoom, player.position);
         			
-				if (door && pressedE) {
-					fade = 0.0f;
-            				fadeOut = false;
-	            			fadeIn = true;
+			if (door && pressedE) {
+				fade = 0.0f;
+            			fadeOut = false;
+	            		fadeIn = true;
 
-	           			transitioning = true;
-        	    			pendingRoomJson = door->targetRoomJson;
-            				pendingSpawn = door->targetSpawn;
+	           		transitioning = true;
+        	    		pendingRoomJson = door->targetRoomJson;
+            			pendingSpawn = door->targetSpawn;
 
             				
-        			}
-				else if (pressedE) {
-					Interaction* interaction = getInteractionInRange(testRoom, player.position);
+        		}
+			else if (pressedE) {
+				Interaction* interaction = getInteractionInRange(testRoom, player.position);
 
-					if (interaction) 
-						runInteraction(*interaction);
-				}
+				if (interaction) 
+					runInteraction(*interaction);
 			}
-        		updateRoomCamera(testRoom, player, camera);
-    		}
+		}
+        	updateRoomCamera(testRoom, player, camera);
+    	}
 
     
    		static int lastCam = -1;
@@ -636,31 +644,99 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 	shader.setVec3("ambientColor", room.ambientColor);
 	
 	const int MAX_POINT_LIGHTS = 8;
+	const int MAX_SPOT_LIGHTS = 4;
 
-	int numLights = 0;
+	int numPointLights = 0;
+	int numSpotLights = 0;
+	
+	bool shouldPrintLightDebug = debugPrintLightInformation;
 
 	if (!room.lights.empty()) {
-		numLights = std::min((int)room.lights.size(), MAX_POINT_LIGHTS);
 
-		for (int i=0; i < numLights; ++i) {
+		for (int i=0; i < (int)room.lights.size(); ++i) {
 			const PointLight& light = room.lights[i];
 
 			float t = static_cast<float>(glfwGetTime());
 
-			float intensity = light.intensity;
-			intensity *= calculateFlickerMultiplier(light, t, i);
+			float multiplier = calculateFlickerMultiplier(light, t, i);
+			float intensity = light.intensity * multiplier;
 
-			std::string base = "pointLights[" + std::to_string(i) +"]";
+			if (shouldPrintLightDebug) {
+				std::cout << "[LIGHT DEBUG] room=" << room.name
+						  << " index=" << i << " type=" << light.type
+						  << " flickerType=" << light.flickerType
+						  << " baseIntensity=" << light.intensity
+						  << " multiplier=" << multiplier
+						  << " uploadedIntensity=" << intensity << "\n";
+			}
 
-			shader.setVec3(base + ".position", light.position);
-			shader.setVec3(base + ".color", light.color);
-			shader.setFloat(base + ".intensity", intensity);
-			shader.setFloat(base + ".radius", light.radius);
+			if (light.type == "spot" && !debugSpotAsPoint) {
+				if (numSpotLights >= MAX_SPOT_LIGHTS) {
+					std::cerr << "Warning: Maximum number of spot lights "
+								 "reached. Ignoring additional spot light.\n";
+					continue;
+				}
+
+				glm::vec3 direction = light.target - light.position;
+
+				if (shouldPrintLightDebug) {
+					std::cout
+						<< "[SPOT DEBUG] position=" << light.position.x << ", "
+						<< light.position.y << ", " << light.position.z
+						<< " target=" << light.target.x << ", "
+						<< light.target.y << ", " << light.target.z
+						<< " direction=" << direction.x << ", " << direction.y
+						<< ", " << direction.z << " inner=" << light.innerCutoff
+						<< " outer=" << light.outerCutoff << "\n";
+				}
+
+				if (glm::length(direction) < 0.001f)
+					direction = glm::vec3(0.0f, -1.0f, 0.0f);
+				else
+					direction = glm::normalize(direction);
+
+				std::string base = "spotLights[" + std::to_string(numSpotLights) +"]";
+
+				shader.setVec3(base + ".position", light.position);
+				shader.setVec3(base + ".direction", direction);
+				shader.setVec3(base + ".color", light.color);
+				shader.setFloat(base + ".intensity", intensity);
+				shader.setFloat(base + ".radius", light.radius);
+				shader.setFloat(base + ".innerCutoff", light.innerCutoff);
+				shader.setFloat(base + ".outerCutoff", light.outerCutoff);
+
+				numSpotLights++;
+
+				if (shouldPrintLightDebug) {
+					std::cout
+						<< "[LIGHT DEBUG] numPointLights=" << numPointLights
+						<< " numSpotLights=" << numSpotLights << "\n";
+				}
+
+			} else {
+
+				if (numPointLights >= MAX_POINT_LIGHTS) {
+					std::cerr << "Warning: Maximum number of point lights "
+								 "reached. Ignoring additional point light.\n";
+					continue;
+				}
+				std::string base = "pointLights[" + std::to_string(numPointLights) + "]";
+				shader.setVec3(base + ".position", light.position);
+				shader.setVec3(base + ".color", light.color);
+				shader.setFloat(base + ".intensity", intensity);
+				shader.setFloat(base + ".radius", light.radius);
+
+				numPointLights++;
+
+			}
+
+			if (debugPrintLightInformation)
+				debugPrintLightInformation = false;
 		}
 	}
 	else {
 		//if there are no lights in the room - a light will be fixed to the player
-		numLights = 1;
+		numPointLights = 1;
 		
 		std::string base = "pointLights[0]";
 
@@ -671,7 +747,8 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 
 	}
 		
-	shader.setInt("numPointLights", numLights);
+	shader.setInt("numPointLights", numPointLights);
+	shader.setInt("numSpotLights", numSpotLights);
 	
 	/* snippet to display number if active point lights 
 	static int frameCounter = 0;
@@ -899,6 +976,17 @@ static float noise1D(float x) {
 }
 
 static float calculateFlickerMultiplier(const PointLight& light, float time, int lightIndex) {
+	if (debugDisableFlicker)
+		return 1.0f;
+
+	if (light.flickerType == "lightning") {
+		if (debugForcedLightningTimer > 0.0f)
+			return light.flickerStrength * 4.0f;
+
+		if (debugLightningPreview)
+			return 1.0f;
+	}
+	
 	if (!light.flicker)
 		return 1.0f;
 
@@ -948,3 +1036,41 @@ static float calculateFlickerMultiplier(const PointLight& light, float time, int
 	return glm::mix(1.0f, simple, strength);
 }
 
+static void updateLightningDebugInput(GLFWwindow* window, float deltatime) {
+	if (keyPressedOnce(window, GLFW_KEY_F5)) {
+		debugForcedLightningTimer = 0.25f;
+		std::cout << "[LIGHT DEBUG] Forced lightning flash triggered\n";
+	}
+
+	if (keyPressedOnce(window, GLFW_KEY_F6)) {
+		debugLightningPreview = !debugLightningPreview;
+		std::cout << "[LIGHT DEBUG] Lightning preview "
+				  << (debugLightningPreview ? "ON" : "OFF") << "\n";
+	}
+
+	if (keyPressedOnce(window, GLFW_KEY_F7)) {
+		debugDisableFlicker = !debugDisableFlicker;
+		std::cout << "[LIGHT DEBUG] Disable flicker: "
+				  << (debugDisableFlicker ? "ON" : "OFF") << "\n";
+	}
+	
+	if (keyPressedOnce(window, GLFW_KEY_F8)) {
+		debugPrintLightInformation = !debugPrintLightInformation;
+		std::cout << "[LIGHT DEBUG] Print light information: "
+				  << (debugPrintLightInformation ? "ON" : "OFF") << "\n";
+	}
+
+	if (keyPressedOnce(window, GLFW_KEY_F9)) {
+		debugSpotAsPoint = !debugSpotAsPoint;
+		std::cout << "[LIGHT DEBUG] Spot as point: "
+				  << (debugSpotAsPoint ? "ON" : "OFF") << "\n";
+	}
+
+	if (debugForcedLightningTimer > 0.0f) {
+		debugForcedLightningTimer -= deltatime;
+		if (debugForcedLightningTimer <= 0.0f) {
+			debugForcedLightningTimer = 0.0f;
+			std::cout << "[LIGHT DEBUG] Forced lightning flash ended\n";
+		}
+	}
+}

@@ -1,334 +1,674 @@
-How the py script for serializing Blender models to json is to be used
-
-The engine converts Blender coordinates as:
-	engine = glm::vec3(blender.x, blender.z, -blender.y);
-
-You should check the initial config values at the top of the script everytime before running it for a specific room.
-
-Change this per room: ROOM_ID = [some name]
-Examples:
-   ROOM_ID = "testRoom"
-   ROOM_ID = "Room01"
-   ROOM_ID = "room02"
-
-Also change CAMERA_NAMES:
-e.g CAMERA_NAMES = ["Cam01", "Cam02"]
-make sure to follow the format of two digits and start from 01
+Blender-to-JSON Room Export Instructions
 
 
-Set ROOM_WALLS_OBJECT to match the mesh used to calculate outer wall bounds.
-e.g ROOM_WALLS_OBJECT = "room_walls"
 
-To add lights in a room:
-1. Add point light: Add -> Light -> Point
-2. Rename it, e.g Light_01
-3. Position it 
-4. Add custom properties, e.g:
-	color = 1.0, 0.75, 0.45
-	intensity = 4.0
-	radius = 14.0
-	flicker = false
-(if you do not add custom properties the script will refer to default values)
-
-To set the ambient color in a room:
-1. Go to Scene and add a custom property (can be a float array)
-2. Name it "ambientColor"
-3. Set the values
-(if you do not add custom ambient color the script will use default values)
-
-
-Naming convention in Blender for my game engine:
-Required:
-	PlayerSpawn
+Purpose:
 	
-	Cameras:
-		Cam[number e.g 0]_Pos
-		Cam[number e.g 0]_Target
-		Cam[number e.g 0]_Zone
-	Colliders:
-		Any mesh object whose name starts wih Col_:
-			e.g Col_Wall_Left, Col_Table, Col_Blocker_01
-	Doors:
-		Door_01
-		Door_Hallway
-		Door_01_Spawn and etc.
-
-	Interactions:
-		Interact_TestNote
-		Interact_WallMessage
-		Interact_* and etc.
+	Explain how to create environment/scene models in Blender.
 	
-	Lights:
-		Light_01
-		Light_02
-		Light_Hallway
+	The OBJ export contains only visible room geometry.
+	
+	The JSON export contains gameplay/helper data such as:
+		player spawn
+		fixed cameras
+		camera zones
+		colliders
+		door triggers
+		interaction triggers
+		point lights
+		spot lights
+		light flicker settings
+		ambient room color
 
-How to set door target room (fov) in Blender:
-	Select door cube/object and:
-		Object properties -> Custom properties -> Add
-	Add:
-		targetRoom (fov)
-	Value example:
-		src/models/room02/room02.json
-	The script shall output: "targetRoom": "src/models/room02/room02.json"
 
-Example setup with two cameras and one door:
-	PlayerSpawn
 
-	Cam01_Pos
-	Cam01_Target
-	Cam01_Zone
+Coordinate system conversion:
 
-	Cam02_Pos
-	Cam02_Target
-	Cam02_Zone
+	The engine converts Blender coordinates as:
+		engine = glm::vec3(blender.x, blender.z, -blender.y);
 
-	Col_Wall_Left
-	Col_Wall_Right
-	Col_BackWall
-	Col_Table
+	This means that:
+		Blender X -> engine X
+		Blender Y -> engine -Z
+		Blender Z -> engine Y
 
-	Door_01
-	Door_01_Spawn
+	So:
+		Blender floor plane is X/Y
+		Blender height is Z
+		Engine floor plane is X/Z
+		Engine height is Y
 
+	The RoomLoader converts the coordinates of the helper objects from Blender space to engine space:
+		playerSpawn
+		camera position
+		camera target
+		camera zones
+		colliders
+		doors
+		door targetSpawn
+		interactions
+		light positions
+		spotlight targets
 
+	The loader does not do any conversion on other data such as:
+		colors, ambientColor, texture paths, model paths, light intensity and etc...
 
 
-Important reminders:
 
-For all Cam*_Zone, Col_*, Door_*, Interact_* objects:
-1. Keep them axis-aligned for now
-2. Apply transforms: Ctrl + A -> Rotation & Scale!!!!
-3. Make zones and doors tall in Blender Z, because Blender Z will be transformer to Y by the engine
-4. For the doors, create a cube that will act as a trigger zone for door transition, add a custom property called "targetRoom" as String and then put the path
-to the .json of the next room
-*For interactions, also have the properties id (string), type (string), asset (the image's path in string format) and repeatable (bool) added. (message also can laso be added as a property but it is aimed towards the type "message" lol)
+Script configuration:
 
-The loader should convert
- 
-playerSpawn
-camera position
-camera target
-camera zones
-colliders
-doors
-interactions
+	You should check the initial config values at the top of the 
+	script everytime before running it for a specific room.
 
-from Blender space into engine space.
+	ROOM_ID
 
-BLENDER ROOM EXPORT PROCESS
+		Change this per room: ROOM_ID = [some name]
+		Examples:
+		    ROOM_ID = "testRoom"
+		    ROOM_ID = "Room01"
+			ROOM_ID = "room02"
 
-!!!Export only the visible room geometry as OBJ, while the meshes for Doors, Interactions, Colliders that are there just for JSON generation and are not visible shouldn't be included the in the final export!!!!
+		This variable is used to generate paths like:
+			MODEL_PATH = f"src/models/{ROOM_ID}/{ROOM_ID}.obj" 
+			JSON_PATH = f"src/models/{ROOM_ID}/{ROOM_ID}.json"
 
-1. Prep
+		Make sure the folder name, OBJ name, MTL name, and JSON path match exactly.
+		Linux paths are case-sensitive.
 
-Visible mesh objects that should be exported:
 
--room walls
--prop objects
--floor/ceiling/walls
--any visible object like furniture or environment models
+	CAMERA_NAMES:
 
-Helper objects that do not take part in the OBJ export:
--camera position, target, zone (e.g Cam01_Pos, Cam01_Target, Cam01_Zone)
--doors (e.g Door_01, Door_01_Spawn)
--interaction zones (e.g Interact_OldNote, Interact_Message)
--colliders (e.g Col_Block)
--player spawn (e.g PlayerSpawn)
--lights (e.g Light_01)
--ambient color (custom property)
+		Set the cameras used by the room:
+			e.g CAMERA_NAMES = ["Cam01", "Cam02"]
+		
+		Make sure to follow the format of two digits and start from 01:
+			Cam01, Cam02, Cam03, Cam04, Cam05, Cam06, Cam07, Cam08, Cam09, Cam10
 
-Helper objects are used by the Blender-to-JSON script only!
+		Each camera should have three helper objects in Blender (add them like regular objects with Ctrl + A):
+			Cam01_Pos
+			Cam01_Target
+			Cam01_Zone
 
-2. Apply transforms
 
-For visible room meshes:
-- Select the visible mesh objects.
-- Press Ctrl + A.
-- Choose Rotation & Scale.
+	ROOM_WALLS_OBJECT:
+		
+		Set ROOM_WALLS_OBJECT to match the mesh used to calculate outer wall bounds.
+			e.g ROOM_WALLS_OBJECT = "room_walls"
 
-For helper objects:
-- Select each trigger/collider/zone helper.
-- Press Ctrl + A.
-- Choose Rotation & Scale.
 
-This keeps exported bounds accurate.
 
-3. Export 
+Blender Naming Convention
 
+	Required / Common helpers:
 
-Select only the visible room geometry:
-- room_walls
-- props
-- floor/ceiling/walls
-- visible environment objects
+		PlayerSpawn
 
-Do NOT select helper objects:
-- Cam*_Zone
-- Door_*
-- Interact_*
-- Col_*
-- PlayerSpawn
+		Cameras:
+			Cam[number e.g 0]_Pos
+			Cam[number e.g 0]_Target
+			Cam[number e.g 0]_Zone
 
-Then:
+		Colliders:
+			Any mesh object whose name starts wih Col_:
+				e.g Col_Tree, Col_Table, Col_Blocker_01
 
-File -> Export -> Wavefront (.obj)
+		Doors:
+			Door_01
+			Door_Hallway
+			Door_01_Spawn and etc.
 
-Use these settings:
+		Interactions:
+			Interact_TestNote
+			Interact_WallMessage
+			Interact_* and etc.
 
-Include:
-- Limit to Selected Objects / Selection Only: ON
-- Object Groups: optional
-- Material Groups: optional
-- Animation: OFF
+		Lights:
+			Point lights: Light_01, Light_02, Light_Hallway
 
-Transform:
-- Scale: 1.00
-- Forward Axis: -Z
-- Up Axis: Y
+			Spot lights:	Light_Storm, Light_Ceiling 
+							Light_Storm_Target, Light_Ceiling_Target
 
-Geometry:
-- Apply Modifiers: ON
-- Smooth Groups: optional
-- Write Normals: ON
-- Include UVs: ON
-- Write Materials: ON
-- Triangulate Faces: ON if available
+			Important:	
+				Spot lights must have a target object named with the suffix "_Target" in Blender 
+						e.g Light_Storm_Target. 
+				If _Target is misssing then the script will consider the target as a point light 
+				and will not export the direction vector to the JSON.
+		
 
-Path Mode:
-- Auto or Copy
-- If using textures, make sure texture paths are relative and the .mtl file is exported.
 
-4. Save paths carefully
+Door setup:
 
-Example room folder:
+	Create a cube where the player should press E. 
+	Name it Door_[some name]
+		e.g Door_01
 
-src/models/test_room02/
+	Add custom property that points to the next room:
+			e.g targetRoom = src/models/room02/room02.json
 
-Expected files:
+	You can also create an empty or helper object named Door_[some name]_Spawn so that the player 
+	appears in that specific location in the next room.
 
-src/models/test_room02/test_room02.obj
-src/models/test_room02/test_room02.mtl
-src/models/test_room02/test_room02.json
-src/models/test_room02/textures/...
+	Important:
+		Blender Z will be converted to engine Y by the RoomLoader, 
+		so the height of the trigger zone should be controlled with Blender Z.
+		Door cubes are JSON helper only.
+		Do not export door helper cubes in the OBJ. 
+		Only the visible room geometry should be exported in the OBJ.
 
-The JSON should contain:
 
-"model": "src/models/test_room02/test_room02.obj"
 
-Make sure folder names, file names, and JSON model paths match exactly.
+Camera setup:
 
-5. Run the Blender-to-JSON script
+	For each camera, create three helper objects in Blender:
+		Cam[number e.g 01]_Pos
+		Cam[number e.g 01]_Target
+		Cam[number e.g 01]_Zone
 
-After exporting the OBJ, run the BlenderToJsonScript.py script.
+	Cam[number]_Pos is the camera position in Blender space.
+	Cam[number]_Target is the camera target in Blender space, where the camera is looking.
+	Cam[number]_Zone is the trigger zone where this camera becomes active once the player enters it.
 
-The script should export helper data into the room JSON:
-- playerSpawn
-- cameras
-- camera zones
-- wall colliders
-- extra Col_* colliders
-- Door_* triggers
-- Interact_* triggers
-- Light_* lights
-- ambientColor
+	A custom property for field of view (fov) can be added to the camera position or zone object:
+		e.g fov = 90.0
 
-The helper coordinates are Blender coordinates.
-The C++ room loader converts them into engine coordinates.
+	If no fov is specified, the script will use a default value of 95.0 degrees.
 
-6. Interaction helper setup
 
-For message interaction:
 
-Create a cube and name it:
+Interaction setup:
+	
+	Interaction helpers are invisible trigger zones.
+	They are included in the JSON but not exported in the OBJ.
 
-Interact_WallMessage
+	Message Interaction:
+		Create a cube and name it Interact_[some name]
+			e.g Interact_WallMessage
+		Add custom properties:
+			id = wall_message
+			type = message
+			message = The wall is covered in strange marks.
+			repeatable = true
 
-Add custom properties:
+	Note Image Interaction:
+		Create a cube and name it Interact_[some name]
+			e.g Interact_TestNote
+		Add custom properties:
+			id = test_note
+			type = note
+			asset = src/ui/notes/test_note.png
+			repeatable = true
+		The note appears as a UI overlay when the player presses E inside the interaction zone.
 
-id = wall_message
-type = message
-message = The wall is covered in strange marks.
-repeatable = true
 
-For note image interaction:
 
-Create a cube and name it:
+Point Light setup:
 
-Interact_TestNote
+	Point lights are used for lamps, bulbs, candles, glowing notes, and general local light sources.
 
-Add custom properties:
+	1. Add point light: 
+		Add -> Light -> Point
 
-id = test_note
-type = note
-asset = src/ui/notes/test_note.png
-repeatable = true
+	2. Rename it
+		e.g Light_01
 
-The Interact_* cube should be included in the JSON, but should NOT be exported in the OBJ.
+	3. Position it 
 
-7. Door helper setup
+	4. Add custom properties:
+		type = point
+		color = 1.0, 0.75, 0.45
+		intensity = 4.0
+		radius = 14.0
+		flicker = false
 
-Create a cube where the player should press E.
-Name it:
+	If you do not add custom properties, the script will refer to default values)
 
-Door_01
 
-Add custom property:
 
-targetRoom = src/models/test_room02/test_room02.json
+Spot Light setup:
 
-Optional:
-Create an empty or helper object named:
+	Spot lights are used for directed light:
+		window lightning
+		flashlights
+		light beams
+		targeted horror lightning
+		and etc...
 
-Door_01_Spawn
+	1. Create two objects:
+		Light_Storm
+		Light_Storm_Target
 
-This defines where the player appears in the target room.
+		Light_Storm is the light source
+		Light_Storm_Target is the target where the light aims.
 
-8. Player spawn
+		The target object must be named with the suffix "_Target" in Blender and not be exported as real light source. 
+		The script itself skips objects with the suffix "_Target" initially 
+		and later adds it to the output JSON as a property for the spot light.
 
-Optional:
-Create an empty named:
+	2. Add custom properties to the light source object:
+		type = spot
+		color = 1.0, 0.75, 0.45
+		intensity = 10.0
+		radius = 25.0
+		innerCutoff = 12.0
+		outerCutoff = 28.0
+		flicker = true
+		flickerType = lightning
+		flickerFrequency = 0.25
+		flickerStrength = 1.0
+		flickerRandomness = 1.0
+		flickerThreshold = 0.93
 
-PlayerSpawn
+	Cutoff values:
+		innerCutoff = angle in degrees where the light is at full intensity
+		outerCutoff = angle in degrees where the light is at zero intensity
+		The engine will interpolate the light intensity between inner and outer cutoff angles.
 
-If missing, the script may default to:
+		For narrow light beams:
+			innerCutoff = 8.0
+			outerCutoff = 18.0
 
-[0, 0, 0]
+		For medium light cone:
+			innerCutoff = 18.0
+			outerCutoff = 45.0
 
-Remember:
-Blender Z becomes engine Y.
-So PlayerSpawn height should be controlled with Blender Z.
+		For wide light cone:
+			innerCutoff = 45.0
+			outerCutoff = 80.0
 
-9. Texture checklist
+		For debugging purposes, you can use wider values and narrow them down later.
 
-If textures appear pink in Blender:
-- Relink missing textures.
-- Use File -> External Data -> Find Missing Files.
-- Then use File -> External Data -> Make Paths Relative.
 
-For engine loading:
-- Keep the .obj, .mtl, and textures together.
-- Prefer relative texture paths in the .mtl file.
+Light flicker setup:
+	
+	Lights can use different flicker modes.
 
-10. Engine-side rule
+	Flicker Properties:
+		enabled = bool (whether the light flickers or not)
+		type = "flicker type" (the nature of the flicker, e.g lightning, old halogen tube)
+		frequency = .float value (how often the light flickers, in seconds)
+		strength = .float value (amount of intensity variation)
+		randomness = .float value (how random the flicker is)
+		threshold = .float value (mainly used for lightning flicker)
 
-If OBJ is exported with:
+	Flicker Types:
 
-Forward Axis: -Z
-Up Axis: Y
+		Normal / Sine:
+			Simple smooth flicker. Default type.
 
-Then the room should be rendered with an identity model matrix.
+				flicker = true 
+				flickerType = sine 
+				flickerFrequency = 8.0 
+				flickerStrength = 0.2
 
-Do NOT rotate the room again in C++.
+		Fluorescent:
+			Fast, nervous office light. Can simulate old fluorescent tubes. 
+				flicker = true 
+				flickerType = fluorescent 
+				flickerFrequency = 16.0 
+				flickerStrength = 0.18 
+				flickerRandomness = 0.05
 
-Correct:
+		Tungsten:
+			Low-voltage incandescent wobble. Can simulate old tungsten bulbs. 
+				flicker = true 
+				flickerType = tungsten 
+				flickerFrequency = 4.0 
+				flickerStrength = 0.35 
+				flickerRandomness = 0.35
 
-glm::mat4 model = glm::mat4(1.0f);
-shader.setMat4("model", model);
-roomModel.Draw(shader);
+		Lightning:
+			Mostly dark, with occasional bright flashes.
+				flicker = true 
+				flickerType = lightning 
+				flickerFrequency = 0.25 
+				flickerStrength = 1.0 
+				flickerRandomness = 1.0 
+				flickerThreshold = 0.93
 
-Incorrect:
+			Higher threshold means rarer flashes.
+				threshold = 0.90 -> more frequent 
+				threshold = 0.96 -> rarer
+
 
-model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0,1,0));
 
-Extra render-time rotation will make the visual mesh disagree with colliders, cameras, doors, and interaction zones.
+Ambient color setup:
+	
+	Ambient color is set as a custom property on the Blender scene.
+
+	To set the ambient color in a room:
+		1. Go to Scene and add a custom property (can be a float array)
+
+		2. Name it "ambientColor"
+
+		3. Set the values
+			(if you do not add custom ambient color the script will use default values)
+
+	Normal dim room:
+		ambientColor = 0.12, 0.12, 0.14
+
+	Warm old room:
+		ambientColor = 0.16, 0.12, 0.09
+
+	Cold blue room:
+		ambientColor = 0.08, 0.10, 0.15
+
+	Very dark room at night:
+		ambientColor = 0.04, 0.04, 0.05
+
+
+
+Important helper object rules:
+	
+	For all 
+		Cam*_Zone 
+		Col_* 
+		Door_* 
+		Interact_* 
+		Light_*_Target
+
+	follow these rules:
+		
+		1. Keep them axis-aligned for now
+		2. Apply transforms: Ctrl + A -> Rotation & Scale!!!!
+		3. Make zones and doors tall in Blender Z, because Blender Z will be transformer to Y by the engine
+		4. Use helper objects for JSON generation only. They should not be exported in the OBJ.
+		5. Light target helpers should not have light custom properties.
+		6. Light targets should not be exported as lights.
+
+
+
+Blender room export process:
+	
+	1. Prepare visible meshes
+		Visible mesh objects that should be exported:
+
+			room_walls
+			prop objects
+			floor
+			ceiling
+			walls
+			furniture
+			environment meshes
+			visible note/paper models
+
+		Helper objects that should not be exported:
+
+			Cam*_Pos
+			Cam*_Target
+			Cam*_Zone
+			Door_*
+			Door_*_Spawn
+			Interact_*
+			Col_*
+			PlayerSpawn
+			Light_*
+			Light_*_Target
+	
+	2. Apply transforms
+
+		For visible room meshes:
+			Select the visible mesh objects.
+			Press Ctrl + A.
+			Choose Rotation & Scale.
+
+		For helper objects:
+			Select each trigger/collider/zone helper.
+			Press Ctrl + A.
+			Choose Rotation & Scale.
+
+		This keeps exported bounds accurate.
+
+	3. Export OBJ
+		
+		Select only the visible room geometry:
+			room_walls 
+			props 
+			floor 
+			ceiling 
+			walls 
+			visible environment objects 
+			visible note/paper models
+
+		Do not select helper objects:
+
+			Cam*_Pos
+			Cam*_Target
+			Cam*_Zone
+			Door_*
+			Door_*_Spawn
+			Interact_*
+			Col_*
+			PlayerSpawn
+			Light_*
+			Light_*_Target
+
+		Then export:
+
+			File -> Export -> Wavefront (.obj)
+
+		Use these settings:
+
+			Include:
+				- Limit to Selected Objects / Selection Only: ON
+				- Object Groups: optional
+				- Material Groups: optional
+				- Animation: OFF
+
+			Transform:
+				- Scale: 1.00
+				- Forward Axis: -Z
+				- Up Axis: Y
+
+			Geometry:
+				- Apply Modifiers: ON
+				- Smooth Groups: optional
+				- Write Normals: ON
+				- Include UVs: ON
+				- Write Materials: ON
+				- Triangulate Faces: ON if available
+
+			Path Mode:
+				- Auto or Copy
+				- If using textures, make sure texture paths are relative and the .mtl file is exported.
+
+	4. Save paths carefully
+
+		Example room folder:
+
+			src/models/test_room02/
+
+		Expected files:
+
+			src/models/test_room02/test_room02.obj
+			src/models/test_room02/test_room02.mtl
+			src/models/test_room02/test_room02.json
+			src/models/test_room02/textures/...
+
+		The JSON should contain:
+
+			"model": "src/models/test_room02/test_room02.obj"
+
+		Make sure folder names, file names, and JSON model paths match exactly.
+
+	5. Run the Blender-to-JSON script
+
+		After exporting the OBJ, run the BlenderToJsonScript.py script.
+
+		The script should export helper data into the room JSON:
+
+			- playerSpawn
+			- cameras
+			- camera zones
+			- wall colliders
+			- extra Col_* colliders
+			- Door_* triggers
+			- Interact_* triggers
+			- Light_* lights
+			- ambientColor
+
+		The helper coordinates are Blender coordinates.
+		The C++ room loader converts them into engine coordinates.
+
+
+	Texture checklist:
+		If textures appear pink in Blender:
+			- Relink missing textures.
+			- Use File -> External Data -> Find Missing Files.
+			- Then use File -> External Data -> Make Paths Relative.
+		For engine loading:
+			- Keep the .obj, .mtl, and textures together.
+			- Prefer relative texture paths in the .mtl file.
+			- Remember that Linux paths are case-sensitive.
+
+
+
+Engine-Side rendering rule:
+	
+	If the OBJ is exported with:
+		Forward axiz: -Z
+		Up axis: Y
+
+	the the room should be rendered with an identuty model matrix.
+
+	Correct:
+		glm::mat4 model = glm::mat4(1.0f); 
+		shader.setMat4("model", model); 
+		roomModel.Draw(shader);
+
+	Incorrect:
+		model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0,1,0));
+
+	Extra render-time rotation will make the visual mesh disagree with:
+		colliders
+		cameras
+		doors
+		interaction zones
+		light positions
+		spotlight targets
+
+
+
+Lightning debug hotkeys:
+	
+	The engine has debug controls for testing lights.
+	
+	Hotkeys:
+
+		F5 = force one lightning flash 
+		F6 = toggle lightning preview 
+		F7 = toggle disable flicker 
+		F8 = print light information once 
+		F9 = treat spotlights as point lights
+
+	Usage:
+		For aiming lightning spotlights:
+
+			F6 ON -> lightning is constantly visible for aiming
+			F8 -> print light position/target/direction once
+			F6 OFF -> return to real flicker timing
+			F5 -> force a lightning flash
+
+		For checking whether a spotlight issue is caused by cone direction:
+
+			F9 ON -> spotlights behave like point lights
+			F9 OFF -> spotlights use normal cone behavior
+
+
+		If a light appears with F9 ON but disappears with F9 OFF, then the 
+		light position/radius/intensity are fine 
+		and the problem is the spotlight target, direction, or cutoff values.
+
+
+Recommended workflow for window lightning:
+	
+	1. Add a light source:
+		Light_Storm
+
+	2. Add a target helper:
+		Light_Storm_Target
+
+	3. Place Light_storm near or outside the window.
+
+	4. Put Light_Storm_Target on the wall/floor/area where the flash should land
+
+	5. Custom properties for Light_Storm:
+		type = spot 
+		color = 0.45, 0.58, 1.0 
+		intensity = 10.0 
+		radius = 25.0 
+		innerCutoff = 12.0 
+		outerCutoff = 28.0 
+		flicker = true 
+		flickerType = lightning 
+		flickerFrequency = 0.25 
+		flickerStrength = 1.0 
+		flickerRandomness = 1.0 
+		flickerThreshold = 0.93
+
+	6. Export JSON
+
+	7. Run the engine
+
+	8. Press F6 to keep lightning visible
+
+	9. Adjusts Light_Storm_Target
+
+	10. Turn preview off and test the flashing:
+		F6 off
+		F5 to force test flash
+
+
+
+Current recommended workflow for note props:
+
+	For visible note/paper items:
+
+		1. Model a small paper mesh in Blender.
+		
+		2. Include the paper mesh in the OBJ export.
+		
+		3. Create an invisible interaction cube:
+			Interact_TestNote
+
+		4. Add note properties
+			id = test_note 
+			type = note 
+			asset = src/ui/notes/test_note.png 
+			repeatable = true
+
+		5. Optionally - add a small point light near the note to point
+			the viewers attention:
+
+				Light_NoteGlow 
+					type = point 
+					color = 1.0, 0.85, 0.45 
+					intensity = 0.8 
+					radius = 2.0 
+					flicker = true 
+					flickerType = sine 
+					flickerFrequency = 2.0 
+					flickerStrength = 0.1
+
+				This gives a simple collectible glow without needing an emissive material system yet.
+
+
+
+Checklist for a blender model:
+
+	Confirm that:
+		
+		- ROOM_ID is correct
+		- CAMERA_NAMES in the script matches the Blender camera helpers 
+		- ROOM_WALLS_OBJECT is correct
+		- PlayerSpawn exists, otherwise a default value is used
+		- Door targetRoom paths are correct
+		- Door spawn helper namers match the door names
+		- Interact_* helpers have correct custom properties
+		- Light_* helpers have correct custom properties
+		- Light_*_Target helpers are not exported as point lights and are named correctly
+		- Scene ambientColor exists if custom ambient is desired
+		- OBJ contains only visible geometry
+		- JSON contains helper/gameplay data
+		- Room renders with identity model matrix in C++
+		- No extra C++ room roation is applied
+
