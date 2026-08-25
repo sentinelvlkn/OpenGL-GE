@@ -42,6 +42,9 @@ float distanceAttenuation(float distanceToLight, float radius) {
 	return clamp(attenuation, 0.0, 1.0);
 }
 
+uniform vec3 emissiveColor;
+uniform float emissiveStrength;
+
 void main() {    
 	
 	vec4 texSample = texture(texture_diffuse1, TexCoords);
@@ -117,7 +120,9 @@ void main() {
 		totalDiffuse += diffuse;
 	}
 
-	vec3 result = ambient + totalDiffuse;
+	vec3 emissive = emissiveColor * emissiveStrength * texColor;
+
+	vec3 result = ambient + totalDiffuse + emissive;
 	result = clamp(result, 0.0, 1.0);
 	
 	FragColor = vec4(result, texSample.a);

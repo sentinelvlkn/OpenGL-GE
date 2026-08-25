@@ -6,6 +6,7 @@
 #include "AABB.h"
 #include "Interaction.h"
 #include "Light.h"
+#include "Prop.h"
 #include "thirdparty/json.hpp"
 #include <iostream>
 
@@ -41,6 +42,7 @@ struct Room {
 	std::vector<DoorTrigger> doors;
 	std::vector<Interaction> interactions;
 	std::vector<PointLight> lights;
+	std::vector<Prop> props;
 };
 
 

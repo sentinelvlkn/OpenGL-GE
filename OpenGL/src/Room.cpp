@@ -214,6 +214,48 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 		              << ", using default.\n";
 	}
 
+	if (j.contains("props")) {
+		if (!j.at("props").is_array())
+			throw std::runtime_error("props is not an array: " + jsonPath);
+
+		for (const auto& jp : j.at("props")) {
+			Prop prop;
+
+			prop.id = jp.value("id", "");
+			prop.modelPath = jp.value("model", "");
+
+			if (prop.modelPath.empty()) {
+				std::cerr << "WARNING: prop has empty model path in "
+						  << jsonPath << "\n";
+				continue;
+			}
+
+			if (jp.contains("position")) {
+				glm::vec3 posB = readVec3(jp.at("position"), "prop position");
+				prop.position = convertBlenderCoords(posB);
+			}
+
+			if (jp.contains("rotation")) {
+				prop.rotation = readVec3(jp.at("rotation"), "prop rotation");
+			}
+
+			if (jp.contains("scale")) {
+				prop.scale = readVec3(jp.at("scale"), "prop scale");
+			}
+
+			prop.glow = jp.value("glow", false);
+
+			if (jp.contains("glowColor")) {
+				prop.glowColor = readVec3(jp.at("glowColor"), "prop glowColor");
+			}
+
+			prop.glowStrength = jp.value("glowStrength", 1.0f);
+
+			room.props.push_back(prop);
+
+		}
+	}
+
 
 	return room;
 }

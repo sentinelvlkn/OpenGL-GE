@@ -152,6 +152,22 @@ def parse_color_prop(value, default=(1.0, 0.75, 0.45)):
 
         return list(default)
 
+def parse_bool_prop(value, default=False):
+    if value is None:
+        return default
+
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, (int, float)):
+        return value != 0
+
+    if isinstance(value, str):
+        s = value.strip().lower()
+        return s in ["true", "1", "yes", "on"]
+
+    return default
+
 def get_scene_ambient(default=(0.12, 0.12, 0.14)):
     value = bpy.context.scene.get("ambientColor", None)
 
@@ -383,6 +399,47 @@ def export_room_json():
 
     ambientColor = get_scene_ambient()
 
+    #--props--
+    props = []
+
+    for obj in bpy.data.objects:
+        if not obj.name.startswith("Prop_"):
+            continue
+
+        prop_id = str(obj.get("id", obj.name))
+        model_path = str(obj.get("model", ""))
+
+        if not model_path:
+            print(f"WARNING: {obj.name} has no model property, skipping prop")
+            continue
+
+        glow = parse_bool_prop(obj.get("glow", False))
+        glow_color = parse_color_prop(obj.get("glowColor", (1.0, 0.85, 0.45)))
+        glow_strength = float(obj.get("glowStrength", 1.0))
+
+        loc = obj.matrix_world.translation
+        rot = obj.rotation_euler
+        scl = obj.scale
+
+        props.append({
+            "id": prop_id,
+            "model": model_path,
+            "position": vec3(loc),
+            "rotation": [
+                round_float(rot.x * 57.2957795),
+                round_float(rot.y * 57.2957795),
+                round_float(rot.z * 57.2957795)
+            ],
+            "scale": [
+                round_float(scl.x),
+                round_float(scl.y),
+                round_float(scl.z)
+            ],
+            "glow": glow,
+            "glowColor": glow_color,
+            "glowStrength": round_float(glow_strength)
+        })
+
     #-------------- final json--------------
     room_json = {
         "name": ROOM_NAME,
@@ -393,6 +450,7 @@ def export_room_json():
         "doors": doors,
         "interactions": interactions,
         "lights": lights,
+        "props": props,
         "ambientColor": ambientColor
     }
 

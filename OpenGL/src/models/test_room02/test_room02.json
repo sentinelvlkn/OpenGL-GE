@@ -151,6 +151,34 @@
       }
     }
   ],
+  "props": [
+    {
+      "id": "test_note_prop",
+      "model": "src/ui/notes/test_note.obj",
+      "position": [
+        0.0,
+        0.0,
+        6.73348
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "glow": true,
+      "glowColor": [
+        1.0,
+        0.85,
+        0.45
+      ],
+      "glowStrength": 1.5
+    }
+  ],
   "ambientColor": [
     0.04,
     0.04,

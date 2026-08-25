@@ -13,7 +13,7 @@ add_executable(${PROJECT_NAME}
     src/Shader.cpp
     
     src/stb_image_impl.cpp
-  "src/glad.c" "src/include/Room.h" "src/Room.cpp")
+  "src/glad.c" "src/include/Room.h" "src/Room.cpp" "src/include/Prop.h")
 
 #includes
 target_include_directories(${PROJECT_NAME} PRIVATE

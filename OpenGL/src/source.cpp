@@ -35,8 +35,8 @@ static const DoorTrigger* getDoorInRange(const Room& room, const glm::vec3& play
 static Interaction* getInteractionInRange(Room& room, const glm::vec3& playerPos);
 static void runInteraction(Interaction& interaction);
 static unsigned int loadTexture2D(const char* path);
-static std::unordered_map<std::string, std::unique_ptr<Model>> roomModelCache;
 static Model& getRoomModel(const Room& room);
+static Model& getCachedModel(const std::string &modelPath);
 static float hashFloat(float x);
 static float noise1D(float x);
 static float calculateFlickerMultiplier(const PointLight& light, float time, int lightIndex);
@@ -86,6 +86,9 @@ static std::string activeMessage;
 static bool noteOpen = false;
 static std::string activeNoteImagePath;
 static unsigned int activeNoteTexture = 0;
+
+static std::unordered_map<std::string, std::unique_ptr<Model>> roomModelCache;
+static std::unordered_map<std::string, std::unique_ptr<Model>> modelCache;
 
 int main()
 {
@@ -280,7 +283,7 @@ int main()
 				
 			player.position = pendingSpawn;
 			roomCameraSwitch(testRoom, player.position);
-        		applyRoomCamera(testRoom, camera);
+        	applyRoomCamera(testRoom, camera);
 
 			fade = 1.0f;
 			fadeIn = false;
@@ -763,15 +766,6 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 		
 	shader.setInt("numPointLights", numPointLights);
 	shader.setInt("numSpotLights", numSpotLights);
-	
-	/* snippet to display number if active point lights 
-	static int frameCounter = 0;
-	frameCounter++;
-
-	if (frameCounter % 120 == 0) {
-	    std::cout << "Rendering room: " << room.name
-        	      << " lights: " << room.lights.size() << "\n";
-	}*/
 
 	float aspect = (float)gFramebufferWidth / (float)gFramebufferHeight;
 
@@ -782,6 +776,9 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 
 	glActiveTexture(GL_TEXTURE0);
 	shader.setInt("texture_diffuse1", 0);
+	
+	shader.setVec3("emissiveColor", glm::vec3(0.0f));
+	shader.setFloat("emissiveStrength", 0.0f);
 
 	glm::mat4 model = glm::mat4(1.0f);
         //model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0,1,0));
@@ -790,6 +787,57 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 
 	glActiveTexture(GL_TEXTURE0);
 	shader.setInt("texture_diffuse1", 0);
+
+	for (const Prop& prop : room.props) {
+
+		if (prop.modelPath.empty()) {
+			std::cerr << "WARNING: prop " << prop.id
+					  << " has empty model path\n";
+			continue;
+		}
+
+		Model& propModel = getCachedModel(prop.modelPath);
+
+		glm::mat4 propModelMatrix = glm::mat4(1.0f);
+
+		propModelMatrix = glm::translate(propModelMatrix, prop.position);
+
+		propModelMatrix = glm::rotate(
+				propModelMatrix, 
+				glm::radians(prop.rotation.x),
+				glm::vec3(1.0f, 0.0f, 0.0f)
+		);
+
+		propModelMatrix = glm::rotate(
+				propModelMatrix, 
+				glm::radians(prop.rotation.y),
+				glm::vec3(0.0f, 1.0f, 0.0f)
+		);
+		
+		propModelMatrix = glm::rotate(
+				propModelMatrix, 
+				glm::radians(prop.rotation.y),
+				glm::vec3(0.0f, 0.0f, 1.0f)
+		);
+
+		propModelMatrix = glm::scale(propModelMatrix, prop.scale);
+
+		shader.setMat4("model", propModelMatrix);
+
+		if (prop.glow) {
+			shader.setVec3("emissiveColor", prop.glowColor);
+			shader.setFloat("emissiveStrength", prop.glowStrength);
+		} else {
+			shader.setVec3("emissiveColor", glm::vec3(0.0f));
+			shader.setFloat("emissiveStrength", 0.0f);
+		}
+
+		propModel.Draw(shader);
+
+	}
+
+	shader.setVec3("emissiveColor", glm::vec3(0.0f));
+	shader.setFloat("emissiveStrength", 0.0f);
 	
 	glm::mat4 playerMo = glm::mat4(1.0f);
 	playerMo = glm::translate(playerMo, player.position);
@@ -1132,4 +1180,30 @@ static void resizeFramebufferAttachments(unsigned int fbo, unsigned int textureC
 
 	std::cout << "[RESIZE] framebuffer: " << gFramebufferWidth << "x"
 			  << gFramebufferHeight << "\n";
+}
+
+static Model& getCachedModel(const std::string& modelPath) {
+
+	if (modelPath.empty()) {
+		throw std::runtime_error("getCachedModel called with empty modelPath");
+	}
+
+	std::string path = FileSystem::pathFromRoot(modelPath);
+
+	auto it = modelCache.find(path);
+
+	if (it == modelCache.end()) {
+		std::cout << "[MODEL CACHE] Loading: " << path << "\n";
+
+		auto model = std::make_unique<Model>(path.c_str());
+		auto result = modelCache.emplace(path, std::move(model));
+
+		it = result.first;
+	}
+
+	if (!it->second) {
+		throw std::runtime_error("Cached model is null: " + path);
+	}
+
+	return *it->second;
 }
