@@ -41,9 +41,15 @@ static float hashFloat(float x);
 static float noise1D(float x);
 static float calculateFlickerMultiplier(const PointLight& light, float time, int lightIndex);
 static void updateLightningDebugInput(GLFWwindow *window, float deltaTime);
+static void resizeFramebufferAttachments(unsigned int fbo, unsigned int textureColorBuffer,
+										 unsigned int rbo);
 
 int WIDTH = 800;
 int HEIGHT = 600;
+
+static int gFramebufferWidth = WIDTH;
+static int gFramebufferHeight = HEIGHT;
+static bool gFramebufferResized = false;
 
 void glfwErrorCallback(int error, const char* description);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -53,10 +59,9 @@ unsigned int loadCubemap(std::vector<std::string> faces);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
-
 Camera camera(glm::vec3(0.0f, 0.0f, 5.0f));
-float lastX = (float)WIDTH / 2.0;
-float lastY = (float)HEIGHT / 2.0;
+float lastX = (float)gFramebufferWidth / 2.0;
+float lastY = (float)gFramebufferHeight / 2.0;
 bool firstMouse = true;
 
 float deltaTime = 0.0f;
@@ -88,8 +93,8 @@ int main()
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	
-	
+	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+
 	//window create
 	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "OPENGL", NULL, NULL);
 	if(window == NULL){
@@ -101,6 +106,7 @@ int main()
 	glfwMakeContextCurrent(window);
 	glfwSetErrorCallback(glfwErrorCallback);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+	glfwGetFramebufferSize(window, &gFramebufferWidth, &gFramebufferHeight);
 	//glfwSetCursorPosCallback(window, mouse_callback);
 	glfwSetScrollCallback(window, scroll_callback);
 
@@ -225,7 +231,7 @@ int main()
 	unsigned int textureColorBuffer;
 	glGenTextures(1, &textureColorBuffer);
 	glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, WIDTH, HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, gFramebufferWidth, gFramebufferHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorBuffer, 0);
@@ -234,7 +240,7 @@ int main()
 	unsigned int RBO;
 	glGenRenderbuffers(1, &RBO);
 	glBindRenderbuffer(GL_RENDERBUFFER, RBO);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, WIDTH, HEIGHT);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, gFramebufferWidth, gFramebufferHeight);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, RBO);
 	
 	//check if framebuffer was crated
@@ -254,6 +260,9 @@ int main()
 		float time = static_cast<float>(glfwGetTime());
 
     	deltaTime = glm::min(deltaTime, 1.0f/30.0f);
+
+		if (gFramebufferResized)
+			resizeFramebufferAttachments(framebuffer ,textureColorBuffer, RBO);
 
     	processInput(window);
 		updateLightningDebugInput(window, deltaTime);
@@ -389,7 +398,12 @@ void glfwErrorCallback(int error, const char* description){
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height){
-	glViewport(0,0,width,height);
+	if (width <= 0 || height <= 0)
+		return;
+
+	gFramebufferWidth = width;
+	gFramebufferHeight = height;
+	gFramebufferResized = true;
 }
 
 void processInput(GLFWwindow* window){
@@ -623,7 +637,7 @@ static void updateRoomCamera(Room& room, const Player& player, Camera& camera){
 
 static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& roomModel, Model& playerModel, const Player& player, const Room& room, Camera& camera){
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-	glViewport(0, 0, WIDTH, HEIGHT);
+	glViewport(0, 0, gFramebufferWidth, gFramebufferHeight);
 
 	glEnable(GL_DEPTH_TEST);
 	glDepthMask(GL_TRUE);
@@ -759,7 +773,9 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
         	      << " lights: " << room.lights.size() << "\n";
 	}*/
 
-	glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)WIDTH/(float)HEIGHT, 0.1f, 100.0f);
+	float aspect = (float)gFramebufferWidth / (float)gFramebufferHeight;
+
+	glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), aspect, 0.1f, 100.0f);
 	glm::mat4 view = camera.getViewMatrix();
 	shader.setMat4("projection", projection);
 	shader.setMat4("view", view);
@@ -786,7 +802,7 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned int textureColorBuffer, float time) {
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glViewport(0, 0, WIDTH, HEIGHT);
+	glViewport(0, 0, gFramebufferWidth, gFramebufferHeight);
 	glDisable(GL_DEPTH_TEST);
 	glDepthMask(GL_FALSE);
 
@@ -1073,4 +1089,47 @@ static void updateLightningDebugInput(GLFWwindow* window, float deltatime) {
 			std::cout << "[LIGHT DEBUG] Forced lightning flash ended\n";
 		}
 	}
+}
+
+static void resizeFramebufferAttachments(unsigned int fbo, unsigned int textureColorBuffer, unsigned int rbo) {
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+	glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
+
+	glTexImage2D(
+		GL_TEXTURE_2D,
+		0, 
+		GL_RGB,
+		gFramebufferWidth,
+		gFramebufferHeight,
+		0,
+		GL_RGB,
+		GL_UNSIGNED_BYTE,
+		nullptr
+	);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+
+	glRenderbufferStorage(
+		GL_RENDERBUFFER,
+		GL_DEPTH24_STENCIL8,
+		gFramebufferWidth,
+		gFramebufferHeight
+	);
+
+	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+		std::cout
+			<< "ERROR::FRAMEBUFFER:: framebuffer incomplete after resize\n";
+	}
+	
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	gFramebufferResized = false;
+
+	std::cout << "[RESIZE] framebuffer: " << gFramebufferWidth << "x"
+			  << gFramebufferHeight << "\n";
 }

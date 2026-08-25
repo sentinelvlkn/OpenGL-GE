@@ -101,7 +101,24 @@
       ]
     }
   ],
-  "interactions": [],
+  "interactions": [
+    {
+      "id": "test_note",
+      "type": "note",
+      "min": [
+        -1.35804,
+        -1.06828,
+        5.38113
+      ],
+      "max": [
+        0.64196,
+        0.93172,
+        7.38113
+      ],
+      "repeatable": true,
+      "asset": "src/ui/notes/test_note.png"
+    }
+  ],
   "lights": [
     {
       "type": "spot",
