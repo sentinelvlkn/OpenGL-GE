@@ -34,3 +34,4 @@ inline InteractionType interactionTypeFromString(const std::string& s){
 
 	return InteractionType::Unknown;
 }
+

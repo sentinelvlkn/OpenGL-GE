@@ -10,6 +10,7 @@
 #include "include/Interaction.h"
 #include "stb_image.h"
 #include "include/FileSystem.h"
+#include "include/TextRenderer.h"
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
@@ -43,6 +44,7 @@ static float calculateFlickerMultiplier(const PointLight& light, float time, int
 static void updateLightningDebugInput(GLFWwindow *window, float deltaTime);
 static void resizeFramebufferAttachments(unsigned int fbo, unsigned int textureColorBuffer,
 										 unsigned int rbo);
+
 
 int WIDTH = 800;
 int HEIGHT = 600;
@@ -89,6 +91,16 @@ static unsigned int activeNoteTexture = 0;
 
 static std::unordered_map<std::string, std::unique_ptr<Model>> roomModelCache;
 static std::unordered_map<std::string, std::unique_ptr<Model>> modelCache;
+
+struct NearbyAction {
+	const DoorTrigger *door = nullptr;
+	Interaction *interaction = nullptr;
+	std::string promptText;
+
+	bool hasAction() const { return door != nullptr || interaction != nullptr; }
+};
+static std::string getInteractionPromptText(const Interaction &interaction);
+static NearbyAction getNearbyAction(Room &room, const glm::vec3 &playerPos);
 
 int main()
 {
@@ -150,6 +162,11 @@ int main()
 		FileSystem::pathFromRoot("src/shaders/note_quad.frag").c_str()
 	);
 
+	Shader textShader(
+		FileSystem::pathFromRoot("src/shaders/text.vert").c_str(),
+		FileSystem::pathFromRoot("src/shaders/text.frag").c_str()
+	);
+
 	/*Model backpackModel(
 		FileSystem::pathFromRoot("src/models/backpack/backpack.obj").c_str()
 	);*/
@@ -184,7 +201,14 @@ int main()
 	
 	std::string pendingRoomJson;
 	glm::vec3 pendingSpawn(0.0f);
-	
+
+	TextRenderer textRenderer;
+	std::string fontPath =
+		FileSystem::pathFromRoot("src/ui/fonts/LektonNerdFontMono-Regular.ttf");
+
+	if (!textRenderer.loadFont(fontPath, 24)) 
+		std::cerr << "Failed to load font\n";
+
 
 	//skybox
 	unsigned int skyboxVAO, skyboxVBO;
@@ -254,6 +278,8 @@ int main()
 	
 	lastFrame = static_cast<float>(glfwGetTime());
 
+	float promptScale = 0.75f;
+
 	//main game loop
 	while (!glfwWindowShouldClose(window)) {
     	float currentFrame = static_cast<float>(glfwGetTime());
@@ -263,6 +289,9 @@ int main()
 		float time = static_cast<float>(glfwGetTime());
 
     	deltaTime = glm::min(deltaTime, 1.0f/30.0f);
+
+		std::string promptText;
+		
 
 		if (gFramebufferResized)
 			resizeFramebufferAttachments(framebuffer ,textureColorBuffer, RBO);
@@ -308,48 +337,49 @@ int main()
 
     	// Gameplay only when not transitioning
     	if (!transitioning) {
-		bool pressedE = keyPressedOnce(window, GLFW_KEY_E);
+			bool pressedE = keyPressedOnce(window, GLFW_KEY_E);
 
-		if (messageOpen) {
-			if (pressedE){
-				messageOpen = false;
-				activeMessage.clear();
+			if (messageOpen) {
+				if (pressedE){
+					messageOpen = false;
+					activeMessage.clear();
 
-				noteOpen = false;
-				activeNoteImagePath.clear();
+					noteOpen = false;
+					activeNoteImagePath.clear();
 
-				if (activeNoteTexture != 0) {
-					glDeleteTextures(1, &activeNoteTexture);
-					activeNoteTexture = 0;
+					if (activeNoteTexture != 0) {
+						glDeleteTextures(1, &activeNoteTexture);
+						activeNoteTexture = 0;
+					}
+
+					std::cout << "[MESSAGE CLOSED]\n";
 				}
-
-				std::cout << "[MESSAGE CLOSED]\n";
 			}
-		}
-		else {
+			else {
 	        	updatePlayerMovement(window, player, camera, testRoom, deltaTime);
 
-        		const DoorTrigger* door = getDoorInRange(testRoom, player.position);
-        			
-			if (door && pressedE) {
-				fade = 0.0f;
-            			fadeOut = false;
-	            		fadeIn = true;
+        		NearbyAction nearbyAction = getNearbyAction(testRoom, player.position);
 
-	           		transitioning = true;
-        	    		pendingRoomJson = door->targetRoomJson;
-            			pendingSpawn = door->targetSpawn;
+				promptText = nearbyAction.promptText;
 
-            				
-        		}
-			else if (pressedE) {
-				Interaction* interaction = getInteractionInRange(testRoom, player.position);
+				if (nearbyAction.door && pressedE) {
+					
+					fade = 0.0f;
+					fadeOut = false;
+					fadeIn = true;
 
-				if (interaction) 
-					runInteraction(*interaction);
+					transitioning = true;
+					pendingRoomJson = nearbyAction.door->targetRoomJson;
+					pendingSpawn = nearbyAction.door->targetSpawn;
+
+				} else if (nearbyAction.interaction && pressedE) {
+					
+					runInteraction(*nearbyAction.interaction);
+
+				}
+
 			}
-		}
-        	updateRoomCamera(testRoom, player, camera);
+        		updateRoomCamera(testRoom, player, camera);
     	}
 
     
@@ -362,7 +392,21 @@ int main()
 		renderSceneToFBO(framebuffer, shader, *testRoomModel, playerModel, player, testRoom, camera);
 		renderScreen(quadVAO, screenShader, textureColorBuffer, time);
 		
-		
+		float promptWidth = textRenderer.measureTextWidth(promptText, promptScale);
+		float promptX = (gFramebufferWidth * 0.5f) - (promptWidth * 0.5f);
+
+		if (!messageOpen && !transitioning && !promptText.empty()) {
+			textRenderer.renderText(
+				textShader,
+				promptText,
+				promptX,
+				80.0f,
+				promptScale,
+				glm::vec3(1.0f, 0.9f, 0.65f),
+				gFramebufferWidth,
+				gFramebufferHeight
+			);
+		}
 
 		if (noteOpen && activeNoteTexture != 0) {
 			glDisable(GL_DEPTH_TEST);
@@ -386,10 +430,10 @@ int main()
 	
 	glDeleteVertexArrays(1, &skyboxVAO);
 	glDeleteVertexArrays(1, &quadVAO);
-    	glDeleteBuffers(1, &skyboxVBO);
+    glDeleteBuffers(1, &skyboxVBO);
 	glDeleteBuffers(1, &quadVBO);
 	glDeleteRenderbuffers(1, &RBO);
-    	glDeleteFramebuffers(1, &framebuffer);
+    glDeleteFramebuffers(1, &framebuffer);
 		
 	glfwTerminate();
     return 0;
@@ -1206,4 +1250,45 @@ static Model& getCachedModel(const std::string& modelPath) {
 	}
 
 	return *it->second;
+}
+
+static std::string getInteractionPromptText(const Interaction &interaction) {
+	switch (interaction.type) {
+	case InteractionType::Note:
+		return "Press E to read";
+
+	case InteractionType::Pickup:
+		return "Press E to pick up";
+
+	case InteractionType::Switch:
+		return "Press E to use";
+
+	case InteractionType::Message:
+		return "Press E to inspect";
+
+	default:
+		return "Press E";
+	}
+}
+
+static NearbyAction getNearbyAction(Room &room, const glm::vec3 &playerPos) {
+	NearbyAction action;
+
+	const DoorTrigger *door = getDoorInRange(room, playerPos);
+
+	if (door) {
+		action.door = door;
+		action.promptText = "Press E to enter";
+		return action;
+	}
+
+	Interaction *interaction = getInteractionInRange(room, playerPos);
+
+	if (interaction) {
+		action.interaction = interaction;
+		action.promptText = getInteractionPromptText(*interaction);
+		return action;
+	}
+
+	return action;
 }

@@ -11,6 +11,7 @@ add_executable(${PROJECT_NAME}
     src/Mesh.cpp
     src/Model.cpp
     src/Shader.cpp
+    src/TextRenderer.cpp
     
     src/stb_image_impl.cpp
   "src/glad.c" "src/include/Room.h" "src/Room.cpp" "src/include/Prop.h")
@@ -36,12 +37,14 @@ find_package(OpenGL REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
+find_package(Freetype REQUIRED)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     OpenGL::GL
     glfw
     glm::glm
     assimp::assimp
+    Freetype::Freetype
 )
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
