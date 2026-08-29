@@ -12,6 +12,7 @@ add_executable(${PROJECT_NAME}
     src/Model.cpp
     src/Shader.cpp
     src/TextRenderer.cpp
+    src/UiRenderer.cpp
     
     src/stb_image_impl.cpp
   "src/glad.c" "src/include/Room.h" "src/Room.cpp" "src/include/Prop.h")

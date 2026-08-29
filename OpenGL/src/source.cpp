@@ -11,6 +11,7 @@
 #include "stb_image.h"
 #include "include/FileSystem.h"
 #include "include/TextRenderer.h"
+#include "include/UiRenderer.h"
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
@@ -167,6 +168,11 @@ int main()
 		FileSystem::pathFromRoot("src/shaders/text.frag").c_str()
 	);
 
+	Shader UiRectangleShader(
+		FileSystem::pathFromRoot("src/shaders/ui_rectangle.vert").c_str(),
+		FileSystem::pathFromRoot("src/shaders/ui_rectangle.frag").c_str()
+	);
+
 	/*Model backpackModel(
 		FileSystem::pathFromRoot("src/models/backpack/backpack.obj").c_str()
 	);*/
@@ -280,6 +286,8 @@ int main()
 
 	float promptScale = 0.75f;
 
+	UiRenderer uiRenderer;
+
 	//main game loop
 	while (!glfwWindowShouldClose(window)) {
     	float currentFrame = static_cast<float>(glfwGetTime());
@@ -392,10 +400,32 @@ int main()
 		renderSceneToFBO(framebuffer, shader, *testRoomModel, playerModel, player, testRoom, camera);
 		renderScreen(quadVAO, screenShader, textureColorBuffer, time);
 		
-		float promptWidth = textRenderer.measureTextWidth(promptText, promptScale);
-		float promptX = (gFramebufferWidth * 0.5f) - (promptWidth * 0.5f);
 
 		if (!messageOpen && !transitioning && !promptText.empty()) {
+			
+			float promptWidth = textRenderer.measureTextWidth(promptText, promptScale);
+			float promptX = (gFramebufferWidth * 0.5f) - (promptWidth * 0.5f);
+
+			float promptY = 80.0f;
+
+			float paddingX = 18.0f;
+			float rectangleX = promptX - paddingX;
+			float rectangleY = promptY - 12.0f;
+			float rectangleW = promptWidth + paddingX * 2.0f;
+			float rectangleH = 36.0f;
+
+			uiRenderer.drawRectangle(
+				UiRectangleShader,
+				rectangleX,
+				rectangleY,
+				rectangleW,
+				rectangleH,
+				glm::vec3(0.0f, 0.0f, 0.0f),
+				0.55f,
+				gFramebufferWidth,
+				gFramebufferHeight
+			);
+
 			textRenderer.renderText(
 				textShader,
 				promptText,
