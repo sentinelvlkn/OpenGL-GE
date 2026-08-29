@@ -248,8 +248,24 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 			if (jp.contains("glowColor")) {
 				prop.glowColor = readVec3(jp.at("glowColor"), "prop glowColor");
 			}
-
+			
 			prop.glowStrength = jp.value("glowStrength", 1.0f);
+
+			prop.spin = jp.value("spin", false);
+
+			if (jp.contains("spinAxis")) {
+				glm::vec3 axisB = readVec3(jp.at("spinAxis"), "prop spinAxis");
+				prop.spinAxis = convertBlenderCoords(axisB);
+
+				if (glm::length(prop.spinAxis) < 0.001f) {
+					prop.spinAxis = glm::vec3(0.0f, 1.0f, 0.0f);
+				} else {
+					prop.spinAxis = glm::normalize(prop.spinAxis);
+				}
+				
+			}
+
+			prop.spinSpeed = jp.value("spinSpeed", 0.0f);
 
 			room.props.push_back(prop);
 

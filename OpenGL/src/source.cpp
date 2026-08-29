@@ -15,6 +15,9 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
+#include <vector>
+#include <sstream>
+#include <algorithm>
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_float4x4.hpp>
@@ -45,6 +48,11 @@ static float calculateFlickerMultiplier(const PointLight& light, float time, int
 static void updateLightningDebugInput(GLFWwindow *window, float deltaTime);
 static void resizeFramebufferAttachments(unsigned int fbo, unsigned int textureColorBuffer,
 										 unsigned int rbo);
+static void debugLog(const std::string &text);
+static std::vector<std::string> wrapTextWidth(const std::string& text, TextRenderer& textRenderer, float scale, float maxWidth);
+static void drawDebugTerminal(UiRenderer &uiRenderer, Shader &uiRectangleShader,
+							  TextRenderer &textRenderer, Shader &textShader,
+							  int screenWidth, int screenHeight);
 
 
 int WIDTH = 800;
@@ -69,6 +77,10 @@ bool firstMouse = true;
 
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
+
+static bool debugTerminalOpen = false;
+static std::vector<std::string> debugTerminalLines;
+static const int DEBUG_TERMINAL_MAX_LINES = 200;
 
 //light debug variables
 static float debugForcedLightningTimer = 0.0f;
@@ -168,10 +180,12 @@ int main()
 		FileSystem::pathFromRoot("src/shaders/text.frag").c_str()
 	);
 
-	Shader UiRectangleShader(
+	Shader uiRectangleShader(
 		FileSystem::pathFromRoot("src/shaders/ui_rectangle.vert").c_str(),
 		FileSystem::pathFromRoot("src/shaders/ui_rectangle.frag").c_str()
 	);
+
+	debugLog("Debug terminal ready. Press F1 to toggle. Press F2 to print player state.");
 
 	/*Model backpackModel(
 		FileSystem::pathFromRoot("src/models/backpack/backpack.obj").c_str()
@@ -187,6 +201,9 @@ int main()
 	    	std::cout << "Cam " << i
         	      << " min(" << c.aabbMin.x << "," << c.aabbMin.y << "," << c.aabbMin.z << ") "
               	<< "max(" << c.aabbMax.x << "," << c.aabbMax.y << "," << c.aabbMax.z << ")\n";
+			/*debuglog("cam " + i + " min(" + c.aabbmin.x + "," + c.aabbmin.y +
+					 "," + c.aabbmin.z + "max(" + c.aabbmax.x + "," +
+					 c.aabbmax.y + "," + c.aabbmax.z + ")");*/
 	}
 
 
@@ -212,8 +229,8 @@ int main()
 	std::string fontPath =
 		FileSystem::pathFromRoot("src/ui/fonts/LektonNerdFontMono-Regular.ttf");
 
-	if (!textRenderer.loadFont(fontPath, 24)) 
-		std::cerr << "Failed to load font\n";
+	if (!textRenderer.loadFont(fontPath, 24))
+		debugLog("Failed to load the font: " + fontPath);
 
 
 	//skybox
@@ -288,6 +305,10 @@ int main()
 
 	UiRenderer uiRenderer;
 
+	debugLog("[BOOT] Debug terminal initialized.");
+	debugLog("[BOOT] Press F1 to toggle terminal.");
+	debugLog("[BOOT] Press F2 to print player state.");
+
 	//main game loop
 	while (!glfwWindowShouldClose(window)) {
     	float currentFrame = static_cast<float>(glfwGetTime());
@@ -307,32 +328,48 @@ int main()
     	processInput(window);
 		updateLightningDebugInput(window, deltaTime);
 
+		if (keyPressedOnce(window, GLFW_KEY_F1))
+			debugTerminalOpen = !debugTerminalOpen;
+
+		if (keyPressedOnce(window, GLFW_KEY_F2)) {
+			std::ostringstream ss;
+
+			ss << "Room: " << testRoom.name
+			   << " | Player: " << player.position.x << ", "
+			   << player.position.y << ", " << player.position.z
+			   << " | Camera: " << testRoom.activeCamera
+			   << " | Props: " << testRoom.props.size()
+			   << " | Lights: " << testRoom.lights.size();
+
+			debugLog(ss.str());
+		}
+
     	updateFade(deltaTime);
 
     	// If fade-out finished, swap rooms
     	if (transitioning && !fadeIn && fade >= 1.0f) {
        		try {
-			testRoom = loadRoomFromJson(FileSystem::pathFromRoot(pendingRoomJson).c_str());
-			testRoomModel = &getRoomModel(testRoom);
-			/*testRoomModel = std::make_unique<Model>(
-				FileSystem::pathFromRoot(testRoom.modelPath).c_str()
-			);*/
+				testRoom = loadRoomFromJson(FileSystem::pathFromRoot(pendingRoomJson).c_str());
+				testRoomModel = &getRoomModel(testRoom);
+				/*testRoomModel = std::make_unique<Model>(
+					FileSystem::pathFromRoot(testRoom.modelPath).c_str()
+				);*/
 				
-			player.position = pendingSpawn;
-			roomCameraSwitch(testRoom, player.position);
-        	applyRoomCamera(testRoom, camera);
+				player.position = pendingSpawn;
+				roomCameraSwitch(testRoom, player.position);
+        		applyRoomCamera(testRoom, camera);
 
-			fade = 1.0f;
-			fadeIn = false;
-			fadeOut = true;
+				fade = 1.0f;
+				fadeIn = false;
+				fadeOut = true;
 
-			transitioning = false;
-			pendingRoomJson.clear();
+				transitioning = false;
+				pendingRoomJson.clear();
 				
 			} catch (const std::exception& e) {
 
-				std::cerr << "Room failed to load: " << e.what() << "\n";
-				
+				std::string exceptionMessage = e.what();
+				debugLog("Room failed to load" + exceptionMessage);
 				fade = 1.0f;
 				fadeIn = false;
 				fadeOut = true;
@@ -360,7 +397,7 @@ int main()
 						activeNoteTexture = 0;
 					}
 
-					std::cout << "[MESSAGE CLOSED]\n";
+					debugLog("[MESSAGE CLOSED]");
 				}
 			}
 			else {
@@ -415,7 +452,7 @@ int main()
 			float rectangleH = 36.0f;
 
 			uiRenderer.drawRectangle(
-				UiRectangleShader,
+				uiRectangleShader,
 				rectangleX,
 				rectangleY,
 				rectangleW,
@@ -453,6 +490,13 @@ int main()
 
 			glEnable(GL_DEPTH_TEST);
 		}
+
+		drawDebugTerminal(	uiRenderer, 
+							uiRectangleShader,
+							textRenderer, 
+							textShader,
+							gFramebufferWidth, 
+							gFramebufferHeight);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -894,6 +938,17 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 				glm::vec3(0.0f, 0.0f, 1.0f)
 		);
 
+		if (prop.spin) {
+			float spinAngle = static_cast<float>(glfwGetTime()) * prop.spinSpeed;
+
+			propModelMatrix = glm::rotate(
+				propModelMatrix, 
+				glm::radians(spinAngle),
+				prop.spinAxis
+			);
+
+		}
+
 		propModelMatrix = glm::scale(propModelMatrix, prop.scale);
 
 		shader.setMat4("model", propModelMatrix);
@@ -1321,4 +1376,177 @@ static NearbyAction getNearbyAction(Room &room, const glm::vec3 &playerPos) {
 	}
 
 	return action;
+}
+
+static void debugLog(const std::string &text) {
+	debugTerminalLines.push_back(text);
+
+	if ((int)debugTerminalLines.size() > DEBUG_TERMINAL_MAX_LINES)
+		debugTerminalLines.erase(debugTerminalLines.begin());
+
+	std::cout << text << "\n";
+}
+
+//wraps by words first and then breaks long words if necessary
+static std::vector<std::string> wrapTextWidth(
+												const std::string& text,
+												TextRenderer& textRenderer,
+												float scale, 
+												float maxWidth) {
+	std::vector<std::string> result;
+
+	if (text.empty()) {
+		result.push_back("");
+		return result;
+	}
+
+	std::istringstream stream(text);
+	std::string word;
+	std::string currentLine;
+
+	while (stream >> word) {
+		std::string candidate;
+
+		if (currentLine.empty())
+			candidate = word;
+		else
+			candidate = currentLine + " " + word;
+
+		if (textRenderer.measureTextWidth(candidate, scale) <= maxWidth)
+			currentLine = candidate;
+		
+		else {
+		
+			if (!currentLine.empty()) {
+				result.push_back(currentLine);
+				currentLine.clear();
+			}
+
+			if (textRenderer.measureTextWidth(word, scale) <= maxWidth)
+				currentLine = word;
+			else {
+				std::string chunk;
+
+				for (char c : word) {
+					std::string chunkCandidate = chunk + c;
+
+					if (textRenderer.measureTextWidth(chunkCandidate, scale) > maxWidth && !chunk.empty()) {
+						result.push_back(chunk);
+						chunk = std::string(1, c);
+					} else
+						chunk = chunkCandidate;
+				}
+				
+				currentLine = chunk;
+			}
+		}
+	}
+
+	if (!currentLine.empty())
+		result.push_back(currentLine);
+
+	return result;
+
+}
+
+static void drawDebugTerminal(UiRenderer &uiRenderer, Shader &uiRectangleShader,
+							  TextRenderer &textRenderer, Shader &textShader,
+							  int screenWidth, int screenHeight) {
+
+	if (!debugTerminalOpen)
+		return;
+
+	float sw = static_cast<float>(screenWidth);
+	float sh = static_cast<float>(screenHeight);
+
+	float panelMargin = 20.0f;
+
+	float panelX = panelMargin;
+	float panelW = sw - panelMargin * 2.0f;
+
+	if (panelW < 240.0f) panelW = 240.0f;
+
+	float panelH = sh * 0.38f;
+
+	if (panelH < 140.0f) panelH = 140.0f;
+	if (panelH > 360.0f) panelH = 360.0f;
+
+	float panelY = sh - panelH - panelMargin;
+
+	uiRenderer.drawRectangle(	uiRectangleShader, 
+								panelX,	
+								panelY, 
+								panelW, 
+								panelH, 
+								glm::vec3(0.0f, 0.0f, 0.0f), 
+								0.78f, 
+								screenWidth,
+								screenHeight
+	);
+
+	float textScale = 0.65f;
+	float padding = 14.0f;
+	float lineHeight = 17.0f;
+
+	textRenderer.renderText(	textShader, 
+								"DEBUG TERMINAL [F1]", 
+								panelX + padding,
+								panelY + panelH - 28.0f, 
+								textScale,
+								glm::vec3(0.75f, 1.0f, 0.75f), 
+								screenWidth,
+								screenHeight
+	);
+
+	if (debugTerminalLines.empty()) {
+
+		textRenderer.renderText(	textShader, 
+									"No debug messages yet.",
+									panelX + padding, 
+									panelY + panelH - 55.0f,
+									textScale, 
+									glm::vec3(0.85f, 0.9f, 0.85f),
+									screenWidth, 
+									screenHeight
+		);
+
+		return;
+	}
+
+		float maxTextWidth = panelW - padding * 2.0f;
+		float startY = panelY + panelH - 55.0f;
+		float bottomY = panelY + padding;
+
+		std::vector<std::string> wrappedLines;
+
+		for (const std::string &line : debugTerminalLines) {
+			std::vector<std::string> wrapped = wrapTextWidth(line, textRenderer, textScale, maxTextWidth);
+			wrappedLines.insert(wrappedLines.end(), wrapped.begin(), wrapped.end());
+		}
+
+		int maxVisibleLines = static_cast<int>((startY - bottomY) / lineHeight);
+		if (maxVisibleLines <= 0)
+			return;
+
+		int startIndex = glm::max(0, static_cast<int>(wrappedLines.size()) - maxVisibleLines);
+
+		float y = startY;
+
+		for (int i = startIndex; i < (int)wrappedLines.size(); ++i) {
+			textRenderer.renderText(	
+										textShader, 
+										wrappedLines[i], 
+										panelX + padding, 
+										y, 
+										textScale,
+										glm::vec3(0.85f, 0.9f, 0.85f), 
+										screenWidth, 
+										screenHeight
+			);
+
+			y -= lineHeight;
+
+			if (y < bottomY)
+				break;
+		}
 }

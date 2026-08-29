@@ -121,6 +121,7 @@ void TextRenderer::renderText(Shader &shader, const std::string &text, float x,
 		return;
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, screenWidth, screenHeight);
 
 	glDisable(GL_DEPTH_TEST);
 	glDepthMask(GL_FALSE);
