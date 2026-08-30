@@ -6,6 +6,7 @@
 #include FT_FREETYPE_H
 
 #include <glm/gtc/matrix_transform.hpp>
+#include "include/DebugLog.h"
 
 TextRenderer::TextRenderer() {
 	glGenVertexArrays(1, &VAO);
@@ -50,14 +51,13 @@ bool TextRenderer::loadFont(const std::string &fontPath,
 
 	FT_Library ft;
 	if (FT_Init_FreeType(&ft)) {
-		std::cerr << "ERROR::FREETYPE: Could not initialize FreeType\n";
+		DebugLog::log("[FREETYPE ERROR] Could not initialize FreeType");
 		return false;
 	}
 
 	FT_Face face;
 	if (FT_New_Face(ft, fontPath.c_str(), 0, &face)) {
-		std::cerr << "ERROR::FREETYPE: Failed to load font: " << fontPath << "\n";
-
+		DebugLog::log(std::string("[FREETYPE ERROR]: Failed to load font: ") + fontPath);
 		FT_Done_FreeType(ft);
 		return false;
 	}
@@ -68,7 +68,7 @@ bool TextRenderer::loadFont(const std::string &fontPath,
 
 	for (unsigned char c = 0; c < 128; c++) {
 		if (FT_Load_Char(face, c, FT_LOAD_RENDER)) {
-			std::cerr << "ERROR::FREETYPE: Failed to load glyph: " << static_cast<int>(c) << "\n";
+			DebugLog::log("[FREETYPE ERROR] Failed to load glyph: " +std::to_string(static_cast<int>(c)));
 			continue;
 		}
 
@@ -109,8 +109,7 @@ bool TextRenderer::loadFont(const std::string &fontPath,
 	FT_Done_Face(face);
 	FT_Done_FreeType(ft);
 
-	std::cout << "[TEXT] Loaded font: " << fontPath << "\n";
-
+	DebugLog::log(std::string("[TEXT] Loaded font: ") + fontPath);
 	return true;
 }
 

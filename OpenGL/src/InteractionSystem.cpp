@@ -1,6 +1,6 @@
-#include "include/Interaction.h"
+#include "include/InteractionSystem.h"
 
-static std::string getInteractionPromptText(const Interaction &interaction) {
+std::string getInteractionPromptText(const Interaction &interaction) {
 	switch (interaction.type) {
 	case InteractionType::Note:
 		return "Press E to read";
@@ -19,7 +19,16 @@ static std::string getInteractionPromptText(const Interaction &interaction) {
 	}
 }
 
-static NearbyAction getNearbyAction(Room& room, const glm::vec3& playerPos) {
+const DoorTrigger *getDoorInRange(const Room &room,
+								  const glm::vec3 &playerPos) {
+	for (const auto &d : room.doors) {
+		if (pointInsideAabb(playerPos, d.aabb.min, d.aabb.max))
+			return &d;
+	}
+	return nullptr;
+}
+
+NearbyAction getNearbyAction(Room &room, const glm::vec3 &playerPos) {
 	NearbyAction action;
 
 	const DoorTrigger *door = getDoorInRange(room, playerPos);
@@ -39,4 +48,16 @@ static NearbyAction getNearbyAction(Room& room, const glm::vec3& playerPos) {
 	}
 
 	return action;
+}
+
+Interaction *getInteractionInRange(Room &room, const glm::vec3 &playerPos) {
+	for (auto &interaction : room.interactions) {
+		if (!interaction.repeatable && interaction.used)
+			continue;
+
+		if (pointInsideAabb(playerPos, interaction.trigger))
+			return &interaction;
+	}
+
+	return nullptr;
 }

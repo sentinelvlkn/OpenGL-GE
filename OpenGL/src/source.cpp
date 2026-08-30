@@ -2,16 +2,20 @@
 #include <cstddef>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <include/Input.h>
 #include "include/Shader.h"
+#include "include/PlayerMovement.h"
 #include "include/Camera.h"
 #include "include/Model.h"
 #include "include/Room.h"
 #include "include/Player.h"
 #include "include/Interaction.h"
+#include "include/InteractionSystem.h"
 #include "stb_image.h"
 #include "include/FileSystem.h"
 #include "include/TextRenderer.h"
 #include "include/UiRenderer.h"
+#include "include/DebugLog.h"
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
@@ -28,16 +32,10 @@
 #include <unordered_map>
 #include "include/test_vertices.h"
 
-static bool circleAABBIntersectXZ(const glm::vec3& pos, float radius, const AABB& box);
-static glm::vec3 getMoveDirInput(GLFWwindow* window, const glm::vec3& camForward, const glm::vec3& camRight);
-static void updatePlayerMovement(GLFWwindow* window, Player& player, const Camera& camera, const Room& room, float deltaTime);
 static void updateFade(float deltaTime);
 static void updateRoomCamera(Room& room, const Player& player, Camera& camera);
 static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& roomModel, Model& playerModel, const Player& player, const Room& room, Camera& camera);
 static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned int textureColorBuffer, float time);
-static bool keyPressedOnce(GLFWwindow* window, int key);
-static const DoorTrigger* getDoorInRange(const Room& room, const glm::vec3& playerPos);
-static Interaction* getInteractionInRange(Room& room, const glm::vec3& playerPos);
 static void runInteraction(Interaction& interaction);
 static unsigned int loadTexture2D(const char* path);
 static Model& getRoomModel(const Room& room);
@@ -48,7 +46,6 @@ static float calculateFlickerMultiplier(const PointLight& light, float time, int
 static void updateLightningDebugInput(GLFWwindow *window, float deltaTime);
 static void resizeFramebufferAttachments(unsigned int fbo, unsigned int textureColorBuffer,
 										 unsigned int rbo);
-static void debugLog(const std::string &text);
 static std::vector<std::string> wrapTextWidth(const std::string& text, TextRenderer& textRenderer, float scale, float maxWidth);
 static void drawDebugTerminal(UiRenderer &uiRenderer, Shader &uiRectangleShader,
 							  TextRenderer &textRenderer, Shader &textShader,
@@ -64,7 +61,6 @@ static bool gFramebufferResized = false;
 
 void glfwErrorCallback(int error, const char* description);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-void processInput(GLFWwindow* window);
 unsigned int loadTexture(const char* path);
 unsigned int loadCubemap(std::vector<std::string> faces);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -79,8 +75,6 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 static bool debugTerminalOpen = false;
-static std::vector<std::string> debugTerminalLines;
-static const int DEBUG_TERMINAL_MAX_LINES = 200;
 
 //light debug variables
 static float debugForcedLightningTimer = 0.0f;
@@ -104,16 +98,6 @@ static unsigned int activeNoteTexture = 0;
 
 static std::unordered_map<std::string, std::unique_ptr<Model>> roomModelCache;
 static std::unordered_map<std::string, std::unique_ptr<Model>> modelCache;
-
-struct NearbyAction {
-	const DoorTrigger *door = nullptr;
-	Interaction *interaction = nullptr;
-	std::string promptText;
-
-	bool hasAction() const { return door != nullptr || interaction != nullptr; }
-};
-static std::string getInteractionPromptText(const Interaction &interaction);
-static NearbyAction getNearbyAction(Room &room, const glm::vec3 &playerPos);
 
 int main()
 {
@@ -185,7 +169,7 @@ int main()
 		FileSystem::pathFromRoot("src/shaders/ui_rectangle.frag").c_str()
 	);
 
-	debugLog("Debug terminal ready. Press F1 to toggle. Press F2 to print player state.");
+	DebugLog::log("Debug terminal ready. Press F1 to toggle. Press F2 to print player state.");
 
 	/*Model backpackModel(
 		FileSystem::pathFromRoot("src/models/backpack/backpack.obj").c_str()
@@ -198,12 +182,17 @@ int main()
 
 	for (int i = 0; i < testRoom.cameras.size(); ++i) {
     		auto& c = testRoom.cameras[i];
-	    	std::cout << "Cam " << i
-        	      << " min(" << c.aabbMin.x << "," << c.aabbMin.y << "," << c.aabbMin.z << ") "
-              	<< "max(" << c.aabbMax.x << "," << c.aabbMax.y << "," << c.aabbMax.z << ")\n";
-			/*debuglog("cam " + i + " min(" + c.aabbmin.x + "," + c.aabbmin.y +
-					 "," + c.aabbmin.z + "max(" + c.aabbmax.x + "," +
-					 c.aabbmax.y + "," + c.aabbmax.z + ")");*/
+			{
+				std::ostringstream ss;
+
+				ss << "Cam " << i << " min(" << c.aabbMin.x << ","
+				   << c.aabbMin.y << "," << c.aabbMin.z << ") "
+				   << "max(" << c.aabbMax.x << "," << c.aabbMax.y << ","
+				   << c.aabbMax.z << ")";
+
+				DebugLog::log(ss.str());
+			}
+			
 	}
 
 
@@ -226,11 +215,10 @@ int main()
 	glm::vec3 pendingSpawn(0.0f);
 
 	TextRenderer textRenderer;
-	std::string fontPath =
-		FileSystem::pathFromRoot("src/ui/fonts/LektonNerdFontMono-Regular.ttf");
+	std::string fontPath = FileSystem::pathFromRoot("src/ui/fonts/LektonNerdFontMono-Regular.ttf");
 
 	if (!textRenderer.loadFont(fontPath, 24))
-		debugLog("Failed to load the font: " + fontPath);
+		DebugLog::log("[TEXT ERROR] Failed to load the font: " + fontPath);
 
 
 	//skybox
@@ -260,7 +248,7 @@ int main()
 	shader.use();	
 
 	skybShader.use();
-    	skybShader.setInt("skybox", 0);
+    skybShader.setInt("skybox", 0);
 	
 	screenShader.use();
 	//screenShader.setInt("screenTexture", 0);
@@ -295,7 +283,7 @@ int main()
 	
 	//check if framebuffer was crated
 	if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE){
-		std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete! Kaput!!!!" << std::endl;
+		DebugLog::log("[FRAMEBUFFER ERROR] Framebuffer is not complete! Kaput!!!!");
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	
@@ -305,9 +293,9 @@ int main()
 
 	UiRenderer uiRenderer;
 
-	debugLog("[BOOT] Debug terminal initialized.");
-	debugLog("[BOOT] Press F1 to toggle terminal.");
-	debugLog("[BOOT] Press F2 to print player state.");
+	DebugLog::log("[BOOT] Debug terminal initialized.");
+	DebugLog::log("[BOOT] Press F1 to toggle terminal.");
+	DebugLog::log("[BOOT] Press F2 to print player state.");
 
 	//main game loop
 	while (!glfwWindowShouldClose(window)) {
@@ -325,7 +313,7 @@ int main()
 		if (gFramebufferResized)
 			resizeFramebufferAttachments(framebuffer ,textureColorBuffer, RBO);
 
-    	processInput(window);
+    	processInput(window, fade, fadeIn, fadeOut);
 		updateLightningDebugInput(window, deltaTime);
 
 		if (keyPressedOnce(window, GLFW_KEY_F1))
@@ -341,7 +329,7 @@ int main()
 			   << " | Props: " << testRoom.props.size()
 			   << " | Lights: " << testRoom.lights.size();
 
-			debugLog(ss.str());
+			DebugLog::log(ss.str());
 		}
 
     	updateFade(deltaTime);
@@ -368,8 +356,7 @@ int main()
 				
 			} catch (const std::exception& e) {
 
-				std::string exceptionMessage = e.what();
-				debugLog("Room failed to load" + exceptionMessage);
+				DebugLog::log(std::string("[ROOM ERROR] Failed to load room: ") + e.what());
 				fade = 1.0f;
 				fadeIn = false;
 				fadeOut = true;
@@ -397,7 +384,7 @@ int main()
 						activeNoteTexture = 0;
 					}
 
-					debugLog("[MESSAGE CLOSED]");
+					DebugLog::log("[MESSAGE CLOSED]");
 				}
 			}
 			else {
@@ -430,8 +417,8 @@ int main()
     
    		static int lastCam = -1;
 		if (testRoom.activeCamera != lastCam) {
-        		std::cout << "Active camera: " << testRoom.activeCamera << "\n";
-        		lastCam = testRoom.activeCamera;
+			DebugLog::log("[CAMERA] Active camera: " + std::to_string(testRoom.activeCamera));
+        	lastCam = testRoom.activeCamera;
 		}
 
 		renderSceneToFBO(framebuffer, shader, *testRoomModel, playerModel, player, testRoom, camera);
@@ -527,34 +514,6 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height){
 	gFramebufferResized = true;
 }
 
-void processInput(GLFWwindow* window){
-
-	if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-		glfwSetWindowShouldClose(window, true);
-
-	//if(glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-	// 	camera.processKeyboard(FORWARD, deltaTime);
-
-	//if(glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-	//	camera.processKeyboard(BACKWARD, deltaTime);
-
-	//if(glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-	//	camera.processKeyboard(LEFT, deltaTime);
-
-	//if(glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-	//	camera.processKeyboard(RIGHT, deltaTime);
-	//fadeIn sets to true
-	if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS) {
-		fade = 0.0f;
-		fadeIn = true;
-	}
-	// fadeOut sets to true	
-	if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS) {
-		fade = 1.0f;
-		fadeOut = true;
-	}
-
-}
 
 unsigned int loadTexture(const char* path){ //load 2D texture from file
 	unsigned int textureID;
@@ -583,7 +542,7 @@ unsigned int loadTexture(const char* path){ //load 2D texture from file
 		stbi_image_free(data);
 	}
 	else {
-		std::cout << "Texture failed to load at path: " << path << std::endl;
+		DebugLog::log(std::string("[TEXTURE LOAD ERROR] Texture failed to load at path: ") + path);
 		stbi_image_free(data);
 	}
 	
@@ -606,7 +565,7 @@ unsigned int loadCubemap(std::vector<std::string> faces){
 			stbi_image_free(data);
 		}
 		else{
-			std::cout << "Cubemap texture failed to load at path: " << faces[i] << std::endl;
+			DebugLog::log("[CUBEMAP ERROR] Failed to load texture: " + faces[i]);
 			stbi_image_free(data);
 		}
 	}
@@ -641,95 +600,6 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn){
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
     camera.processMouseScroll(static_cast<float>(yoffset));
-}
-
-static bool circleAABBIntersectXZ(const glm::vec3& pos, float radius, const AABB& box){
-	float closestX = glm::clamp(pos.x, box.min.x, box.max.x);
-	float closestZ = glm::clamp(pos.z, box.min.z, box.max.z);
-
-	float dx = pos.x - closestX;
-	float dz = pos.z - closestZ;
-
-	return (dx * dx + dz * dz) < (radius * radius);
-}
-
-static glm::vec3 getMoveDirInput(GLFWwindow* window, const glm::vec3& camForward, const glm::vec3& camRight){
-	glm::vec3 moveDir(0.0f);
-	
-	if(glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-		moveDir += camForward;
-	if(glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-		moveDir -= camForward;
-	if(glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-		moveDir -= camRight;
-	if(glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-		moveDir += camRight;
-	
-	if(glm::length(moveDir) > 0.0f)
-		moveDir = glm::normalize(moveDir);
-
-	return moveDir;
-}
-
-
-static void updatePlayerMovement(GLFWwindow* window,
-                                 Player& player,
-                                 const Camera& camera,
-                                 const Room& room,
-                                 float deltaTime)
-{
-    // clamp dt to reduce tunneling on frame spikes
-    deltaTime = glm::min(deltaTime, 1.0f / 30.0f);
-
-    // camera-relative basis (flattened)
-    glm::vec3 camForward = camera.Front;
-    camForward.y = 0.0f;
-    if (glm::length(camForward) > 0.0001f) camForward = glm::normalize(camForward);
-    else camForward = glm::vec3(0, 0, -1);
-
-    glm::vec3 camRight = camera.Right;
-    camRight.y = 0.0f;
-    if (glm::length(camRight) > 0.0001f) camRight = glm::normalize(camRight);
-    else camRight = glm::vec3(1, 0, 0);
-
-    glm::vec3 moveDir = getMoveDirInput(window, camForward, camRight);
-    if (glm::length(moveDir) < 0.0001f)
-        return;
-
-    const float playerRadius = 0.40f;
-
-    // substeps
-    const int steps = 4;
-    const float dt = deltaTime / (float)steps;
-
-    static int lastHit = -1;
-
-    for (int s = 0; s < steps; ++s) {
-        glm::vec3 nextPos = player.position + moveDir * player.speed * dt;
-
-        bool blocked = false;
-        int hitIndex = -1;
-
-        for (int i = 0; i < (int)room.colliders.size(); ++i) {
-            if (circleAABBIntersectXZ(nextPos, playerRadius, room.colliders[i])) {
-                blocked = true;
-                hitIndex = i;
-                break;
-            }
-        }
-
-        if (blocked) {
-            if (hitIndex != lastHit) {
-                std::cout << "Blocked by collider #" << hitIndex << "\n";
-                lastHit = hitIndex;
-            }
-            return; // stop moving further this frame
-        }
-
-        // not blocked -> commit this substep
-        player.position = nextPos;
-        lastHit = -1;
-    }
 }
 
 static void updateFade(float deltaTime) {
@@ -797,32 +667,38 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 			float intensity = light.intensity * multiplier;
 
 			if (shouldPrintLightDebug) {
-				std::cout << "[LIGHT DEBUG] room=" << room.name
-						  << " index=" << i << " type=" << light.type
-						  << " flickerType=" << light.flickerType
-						  << " baseIntensity=" << light.intensity
-						  << " multiplier=" << multiplier
-						  << " uploadedIntensity=" << intensity << "\n";
+				std::ostringstream ss;
+
+				ss << "[LIGHT DEBUG] room=" << room.name << " index=" << i
+				   << " type=" << light.type
+				   << " flickerType=" << light.flickerType
+				   << " baseIntensity=" << light.intensity
+				   << " multiplier=" << multiplier
+				   << " uploadedIntensity=" << intensity;
+
+				DebugLog::log(ss.str());
 			}
 
 			if (light.type == "spot" && !debugSpotAsPoint) {
 				if (numSpotLights >= MAX_SPOT_LIGHTS) {
-					std::cerr << "Warning: Maximum number of spot lights "
-								 "reached. Ignoring additional spot light.\n";
+					DebugLog::log("[LIGHT WARNING] Maximum number of spot lights reached. Ignoring additional spot light.");
 					continue;
 				}
 
 				glm::vec3 direction = light.target - light.position;
 
 				if (shouldPrintLightDebug) {
-					std::cout
-						<< "[SPOT DEBUG] position=" << light.position.x << ", "
-						<< light.position.y << ", " << light.position.z
-						<< " target=" << light.target.x << ", "
-						<< light.target.y << ", " << light.target.z
-						<< " direction=" << direction.x << ", " << direction.y
-						<< ", " << direction.z << " inner=" << light.innerCutoff
-						<< " outer=" << light.outerCutoff << "\n";
+					std::ostringstream ss;
+
+					ss << "[SPOT DEBUG] position=" << light.position.x << ", "
+					   << light.position.y << ", " << light.position.z
+					   << " target=" << light.target.x << ", " << light.target.y
+					   << ", " << light.target.z << " direction=" << direction.x
+					   << ", " << direction.y << ", " << direction.z
+					   << " inner=" << light.innerCutoff
+					   << " outer=" << light.outerCutoff;
+
+					DebugLog::log(ss.str());
 				}
 
 				if (glm::length(direction) < 0.001f)
@@ -843,16 +719,17 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 				numSpotLights++;
 
 				if (shouldPrintLightDebug) {
-					std::cout
-						<< "[LIGHT DEBUG] numPointLights=" << numPointLights
-						<< " numSpotLights=" << numSpotLights << "\n";
+					std::ostringstream ss;
+
+					ss << "[LIGHT DEBUG] numPointLights=" << numPointLights << " numSpotLights=" << numSpotLights;
+
+					DebugLog::log(ss.str());
 				}
 
 			} else {
 
 				if (numPointLights >= MAX_POINT_LIGHTS) {
-					std::cerr << "Warning: Maximum number of point lights "
-								 "reached. Ignoring additional point light.\n";
+					DebugLog::log("[LIGHT WARNING] Maximum number of point lights reached. Ignoring additional point light.");
 					continue;
 				}
 				std::string base = "pointLights[" + std::to_string(numPointLights) + "]";
@@ -909,8 +786,7 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 	for (const Prop& prop : room.props) {
 
 		if (prop.modelPath.empty()) {
-			std::cerr << "WARNING: prop " << prop.id
-					  << " has empty model path\n";
+			DebugLog::log(std::string("[PROP WARNING] Prop has empty model path: ") + prop.id);
 			continue;
 		}
 
@@ -934,7 +810,7 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 		
 		propModelMatrix = glm::rotate(
 				propModelMatrix, 
-				glm::radians(prop.rotation.y),
+				glm::radians(prop.rotation.z),
 				glm::vec3(0.0f, 0.0f, 1.0f)
 		);
 
@@ -1012,43 +888,14 @@ static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned in
 	glEnable(GL_DEPTH_TEST);
 }
 
-static bool keyPressedOnce(GLFWwindow* window, int key) {
-
-    static bool wasDown[GLFW_KEY_LAST + 1] = { false };
-    bool down = glfwGetKey(window, key) == GLFW_PRESS;
-    bool pressed = down && !wasDown[key];
-    wasDown[key] = down;
-    return pressed;
-}
-
-static const DoorTrigger* getDoorInRange(const Room& room, const glm::vec3& playerPos) {
-    for (const auto& d : room.doors) {
-        if (pointInsideAabb(playerPos, d.aabb.min, d.aabb.max))
-            return &d;
-    }
-    return nullptr;
-}
-
-static Interaction* getInteractionInRange(Room& room, const glm::vec3& playerPos){
-	for (auto& interaction : room.interactions) {
-		if (!interaction.repeatable && interaction.used) 
-			continue;
-
-		if (pointInsideAabb(playerPos, interaction.trigger))
-			return &interaction;
-	}
-
-	return nullptr;
-}
-
 static void runInteraction(Interaction& interaction){
 	switch (interaction.type){
 		case InteractionType::Message:
 			activeMessage = interaction.message;
 			messageOpen = true;
 
-			std::cout << "[MESSAGE] " << interaction.message << "\n";
-			std::cout << "Press E to close" << "\n";
+			DebugLog::log("[MESSAGE] " + interaction.message);
+			DebugLog::log("[MESSAGE] Press E to close.");
 
 			break;
 
@@ -1067,27 +914,36 @@ static void runInteraction(Interaction& interaction){
 				FileSystem::pathFromRoot(activeNoteImagePath).c_str()
 			);
 
-			std::cout << "[NOTE OPENED] " << activeNoteImagePath << "\n";
-	
-			std::cout << "Press E to close" << "\n";
+			DebugLog::log("[NOTE] Opened: " + activeNoteImagePath);
+			DebugLog::log("[NOTE] Press E to close.");
+
 			break;
 
 		case InteractionType::Pickup:
-			std::cout << "[PICKUP] Picked up: " << interaction.targetId << "\n";
+			activeMessage = "Picked up: " + interaction.targetId;
 			messageOpen = true;
-			std::cout << "Press E to close" << "\n";
+
+			DebugLog::log("[PICKUP] Picked up: " + interaction.targetId);
+			DebugLog::log("[PICKUP] Press E to close.");
+
 			break;
 
 		case InteractionType::Switch:
-			std::cout << "[SWICTH] Triggered: " << interaction.targetId << "\n";
+			activeMessage = "Triggered: " + interaction.targetId;
 			messageOpen = true;
-			std::cout << "Press E to close" << "\n";
+
+			DebugLog::log("[SWITCH] Triggered: " + interaction.targetId);
+			DebugLog::log("[SWITCH] Press E to close.");
+
 			break;
 
 		default:
-			std::cout << "[INTERACTION] Unknown interaction: " << interaction.id << "\n";
+			activeMessage = "Unknown interaction: " + interaction.id;
 			messageOpen = true;
-			std::cout << "Press E to close" << "\n";
+
+			DebugLog::log("[INTERACTION] Unknown interaction: " + interaction.id);
+			DebugLog::log("[INTERACTION] Press E to close.");
+
 			break;
 	}
 
@@ -1133,7 +989,7 @@ static unsigned int loadTexture2D(const char* path) {
 		stbi_image_free(data);
 	}
 	else {
-		std::cerr << "Failed to load UI texture: " << path << "\n";
+		DebugLog::log(std::string("[UI TEXTURE ERROR] Failed to load: ") + path);
 		stbi_image_free(data);
 	}
 	
@@ -1232,38 +1088,34 @@ static float calculateFlickerMultiplier(const PointLight& light, float time, int
 static void updateLightningDebugInput(GLFWwindow* window, float deltatime) {
 	if (keyPressedOnce(window, GLFW_KEY_F5)) {
 		debugForcedLightningTimer = 0.25f;
-		std::cout << "[LIGHT DEBUG] Forced lightning flash triggered\n";
+		DebugLog::log("[LIGHT DEBUG] Forced lightning flash triggered");
 	}
 
 	if (keyPressedOnce(window, GLFW_KEY_F6)) {
 		debugLightningPreview = !debugLightningPreview;
-		std::cout << "[LIGHT DEBUG] Lightning preview "
-				  << (debugLightningPreview ? "ON" : "OFF") << "\n";
+		DebugLog::log(std::string("[LIGHT DEBUG] Lightning preview ") + (debugLightningPreview ? "ON" : "OFF") );
 	}
 
 	if (keyPressedOnce(window, GLFW_KEY_F7)) {
 		debugDisableFlicker = !debugDisableFlicker;
-		std::cout << "[LIGHT DEBUG] Disable flicker: "
-				  << (debugDisableFlicker ? "ON" : "OFF") << "\n";
+		DebugLog::log(std::string("[LIGHT DEBUG] Disable flicker: ") + (debugDisableFlicker ? "ON" : "OFF"));
 	}
 	
 	if (keyPressedOnce(window, GLFW_KEY_F8)) {
 		debugPrintLightInformation = !debugPrintLightInformation;
-		std::cout << "[LIGHT DEBUG] Print light information: "
-				  << (debugPrintLightInformation ? "ON" : "OFF") << "\n";
+		DebugLog::log(std::string("[LIGHT DEBUG] Print light information: ") + (debugPrintLightInformation ? "ON" : "OFF"));
 	}
 
 	if (keyPressedOnce(window, GLFW_KEY_F9)) {
 		debugSpotAsPoint = !debugSpotAsPoint;
-		std::cout << "[LIGHT DEBUG] Spot as point: "
-				  << (debugSpotAsPoint ? "ON" : "OFF") << "\n";
+		DebugLog::log(std::string("[LIGHT DEBUG] Spot as point: ") + (debugSpotAsPoint ? "ON" : "OFF"));
 	}
 
 	if (debugForcedLightningTimer > 0.0f) {
 		debugForcedLightningTimer -= deltatime;
 		if (debugForcedLightningTimer <= 0.0f) {
 			debugForcedLightningTimer = 0.0f;
-			std::cout << "[LIGHT DEBUG] Forced lightning flash ended\n";
+			DebugLog::log("[LIGHT DEBUG] Forced lightning flash ended");
 		}
 	}
 }
@@ -1299,22 +1151,20 @@ static void resizeFramebufferAttachments(unsigned int fbo, unsigned int textureC
 	glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-		std::cout
-			<< "ERROR::FRAMEBUFFER:: framebuffer incomplete after resize\n";
+		DebugLog::log("[FRAMEBUFFER ERROR] Framebuffer incomplete after resize");
 	}
 	
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	gFramebufferResized = false;
 
-	std::cout << "[RESIZE] framebuffer: " << gFramebufferWidth << "x"
-			  << gFramebufferHeight << "\n";
+	DebugLog::log("[FBO RESIZE] Framebuffer: " + std::to_string(gFramebufferWidth) + "x" + std::to_string(gFramebufferHeight));
 }
 
 static Model& getCachedModel(const std::string& modelPath) {
 
 	if (modelPath.empty()) {
-		throw std::runtime_error("getCachedModel called with empty modelPath");
+		throw std::runtime_error("[CACHE MODEL ERROR] getCachedModel called with empty modelPath");
 	}
 
 	std::string path = FileSystem::pathFromRoot(modelPath);
@@ -1322,7 +1172,7 @@ static Model& getCachedModel(const std::string& modelPath) {
 	auto it = modelCache.find(path);
 
 	if (it == modelCache.end()) {
-		std::cout << "[MODEL CACHE] Loading: " << path << "\n";
+		DebugLog::log("[MODEL CACHE] Loading: " + path);
 
 		auto model = std::make_unique<Model>(path.c_str());
 		auto result = modelCache.emplace(path, std::move(model));
@@ -1331,60 +1181,10 @@ static Model& getCachedModel(const std::string& modelPath) {
 	}
 
 	if (!it->second) {
-		throw std::runtime_error("Cached model is null: " + path);
+		throw std::runtime_error("[CACHE MODEL ERROR] Cached model is null: " + path);
 	}
 
 	return *it->second;
-}
-
-static std::string getInteractionPromptText(const Interaction &interaction) {
-	switch (interaction.type) {
-	case InteractionType::Note:
-		return "Press E to read";
-
-	case InteractionType::Pickup:
-		return "Press E to pick up";
-
-	case InteractionType::Switch:
-		return "Press E to use";
-
-	case InteractionType::Message:
-		return "Press E to inspect";
-
-	default:
-		return "Press E";
-	}
-}
-
-static NearbyAction getNearbyAction(Room &room, const glm::vec3 &playerPos) {
-	NearbyAction action;
-
-	const DoorTrigger *door = getDoorInRange(room, playerPos);
-
-	if (door) {
-		action.door = door;
-		action.promptText = "Press E to enter";
-		return action;
-	}
-
-	Interaction *interaction = getInteractionInRange(room, playerPos);
-
-	if (interaction) {
-		action.interaction = interaction;
-		action.promptText = getInteractionPromptText(*interaction);
-		return action;
-	}
-
-	return action;
-}
-
-static void debugLog(const std::string &text) {
-	debugTerminalLines.push_back(text);
-
-	if ((int)debugTerminalLines.size() > DEBUG_TERMINAL_MAX_LINES)
-		debugTerminalLines.erase(debugTerminalLines.begin());
-
-	std::cout << text << "\n";
 }
 
 //wraps by words first and then breaks long words if necessary
@@ -1498,7 +1298,9 @@ static void drawDebugTerminal(UiRenderer &uiRenderer, Shader &uiRectangleShader,
 								screenHeight
 	);
 
-	if (debugTerminalLines.empty()) {
+	const std::vector<std::string> &lines = DebugLog::getLines();
+
+	if (lines.empty()) {
 
 		textRenderer.renderText(	textShader, 
 									"No debug messages yet.",
@@ -1513,40 +1315,40 @@ static void drawDebugTerminal(UiRenderer &uiRenderer, Shader &uiRectangleShader,
 		return;
 	}
 
-		float maxTextWidth = panelW - padding * 2.0f;
-		float startY = panelY + panelH - 55.0f;
-		float bottomY = panelY + padding;
+	float maxTextWidth = panelW - padding * 2.0f;
+	float startY = panelY + panelH - 55.0f;
+	float bottomY = panelY + padding;
 
-		std::vector<std::string> wrappedLines;
+	std::vector<std::string> wrappedLines;
 
-		for (const std::string &line : debugTerminalLines) {
-			std::vector<std::string> wrapped = wrapTextWidth(line, textRenderer, textScale, maxTextWidth);
-			wrappedLines.insert(wrappedLines.end(), wrapped.begin(), wrapped.end());
-		}
+	for (const std::string &line : lines) {
+		std::vector<std::string> wrapped = wrapTextWidth(line, textRenderer, textScale, maxTextWidth);
+		wrappedLines.insert(wrappedLines.end(), wrapped.begin(), wrapped.end());
+	}
 
-		int maxVisibleLines = static_cast<int>((startY - bottomY) / lineHeight);
-		if (maxVisibleLines <= 0)
-			return;
+	int maxVisibleLines = static_cast<int>((startY - bottomY) / lineHeight);
+	if (maxVisibleLines <= 0)
+		return;
 
-		int startIndex = glm::max(0, static_cast<int>(wrappedLines.size()) - maxVisibleLines);
+	int startIndex = glm::max(0, static_cast<int>(wrappedLines.size()) - maxVisibleLines);
 
-		float y = startY;
+	float y = startY;
 
-		for (int i = startIndex; i < (int)wrappedLines.size(); ++i) {
-			textRenderer.renderText(	
-										textShader, 
-										wrappedLines[i], 
-										panelX + padding, 
-										y, 
-										textScale,
-										glm::vec3(0.85f, 0.9f, 0.85f), 
-										screenWidth, 
-										screenHeight
-			);
+	for (int i = startIndex; i < (int)wrappedLines.size(); ++i) {
+		textRenderer.renderText(	
+									textShader, 
+									wrappedLines[i], 
+									panelX + padding, 
+									y, 
+									textScale,
+									glm::vec3(0.85f, 0.9f, 0.85f), 
+									screenWidth, 
+									screenHeight
+		);
 
-			y -= lineHeight;
+		y -= lineHeight;
 
-			if (y < bottomY)
-				break;
-		}
+		if (y < bottomY)
+			break;
+	}
 }

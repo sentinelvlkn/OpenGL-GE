@@ -12,6 +12,7 @@
 #include <assimp/types.h>
 #include <cstring>
 #include <vector>
+#include "include/DebugLog.h"
 
 Model::Model(std::string const& path, bool gamma) : gammaCorrection(gamma) {
 	loadModel(path);
@@ -28,7 +29,7 @@ void Model::loadModel(std::string const& path){
 	Assimp::Importer importer;
 	const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
 	if(!scene){
- 		std::cout << "Error : Assimp : " << importer.GetErrorString() << std::endl;
+		DebugLog::log("[ASSIMP ERROR] " + std::string(importer.GetErrorString()));
 		return;
 	}
 	
@@ -155,7 +156,7 @@ unsigned int TextureFromFile(const char *path, const std::string &directory, boo
 		stbi_image_free(data);
 	}
 	else {
-		std::cout << "Texture failed to load at path: " << path << std::endl;
+		DebugLog::log(std::string("[TEXTURE LOAD ERROR] Texture failed to load at path: ") + path);
 		stbi_image_free(data);
 	}
 

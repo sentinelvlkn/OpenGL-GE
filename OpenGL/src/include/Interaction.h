@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <cstdint>
+
 #include "AABB.h"
 
 enum class InteractionType {
@@ -34,4 +36,5 @@ inline InteractionType interactionTypeFromString(const std::string& s){
 
 	return InteractionType::Unknown;
 }
+
 

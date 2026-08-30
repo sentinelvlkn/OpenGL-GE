@@ -4,6 +4,8 @@
 #include <fstream>
 #include <stdexcept>
 #include <iostream>
+#include <sstream>
+#include "include/DebugLog.h"
 //using json = nlohmann::json;
 
 static glm::vec3 readVec3(const json &arr, const char *fieldName) {
@@ -14,12 +16,12 @@ static glm::vec3 readVec3(const json &arr, const char *fieldName) {
 }
 
 Room loadRoomFromJson(const std::string &jsonPath) {
-	std::cout << "Trying to open room json: " << std::filesystem::absolute(jsonPath) << "\n";
+	std::filesystem::path absolutePath = std::filesystem::absolute(jsonPath);
+	DebugLog::log("[ROOM] Opening room json:" + absolutePath.string());
 	std::ifstream f(jsonPath);
 	if (!f.is_open()) {
-		std::cerr << "Failed to open json: " << jsonPath << "\n";
-		std::cerr << "Absolute: " << std::filesystem::absolute(jsonPath) << "\n";
-		throw std::runtime_error("Failed to open json " + jsonPath);
+		DebugLog::log("[ROOM ERROR] Failed to open json: " + absolutePath.string());
+		throw std::runtime_error("[ROOM ERROR] Failed to open json " + jsonPath);
 	}
 		
 
@@ -35,7 +37,7 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 		room.playerSpawn = convertBlenderCoords(readVec3(j.at("playerSpawn"), "playerSpawn"));
 
 	if (!j.contains("cameras") || !j.at("cameras").is_array())
-		throw std::runtime_error("Room json missing cameras' array: " + jsonPath);
+		throw std::runtime_error("[ROOM ERROR] Room json missing cameras' array: " + jsonPath);
 	
 	for (const auto &jc : j.at("cameras")) {
 		RoomCamera cam;
@@ -47,20 +49,28 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 		glm::vec3 maxB = readVec3(jc.at("zoneMax"), "zoneMax");
 		convertBlenderAABB(minB, maxB, cam.aabbMin, cam.aabbMax);
         
-        std::cout << "Converted zone (Engine): min("
-          << cam.aabbMin.x << "," << cam.aabbMin.y << "," << cam.aabbMin.z
-          << ") max("
-          << cam.aabbMax.x << "," << cam.aabbMax.y << "," << cam.aabbMax.z
-          << ")\n";
+        {
+			std::ostringstream ss;
 
+			ss << "[CAMERA] Converted zone (Engine): min(" << cam.aabbMin.x
+			   << ", " << cam.aabbMin.y << ", " << cam.aabbMin.z << ") max("
+			   << cam.aabbMax.x << ", " << cam.aabbMax.y << ", "
+			   << cam.aabbMax.z << ")";
+
+			DebugLog::log(ss.str());
+		}
 
 		cam.fov = jc.value("fov", 45.0f);
         
-        std::cout << "JSON zoneMin (Blender): "
-          << minB.x << "," << minB.y << "," << minB.z
-          << "  zoneMax: "
-          << maxB.x << "," << maxB.y << "," << maxB.z
-          << "\n";
+        {
+			std::ostringstream ss;
+
+			ss << "[CAMERA] JSON zoneMin (Blender): " << minB.x << ", "
+			   << minB.y << ", " << minB.z << " zoneMax: " << maxB.x << ", "
+			   << maxB.y << ", " << maxB.z;
+
+			DebugLog::log(ss.str());
+		}
 
 
 		room.cameras.push_back(cam);
@@ -68,7 +78,7 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 	
 	if (j.contains("colliders")) {
 		if(!j.at("colliders").is_array())
-			throw std::runtime_error("colliders is not an array: " + jsonPath);
+			throw std::runtime_error("[ROOM ERROR] colliders is not an array: " + jsonPath);
 
 		for(const auto& c : j["colliders"]) {
 			glm::vec3 minB = readVec3(c["min"], "min");
@@ -89,7 +99,7 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 
 	if (j.contains("doors")) {
 	    if (!j.at("doors").is_array())
-        	throw std::runtime_error("doors is not an array: " + jsonPath);
+        	throw std::runtime_error("[ROOM ERROR] doors is not an array: " + jsonPath);
 
 	    for (const auto& d : j.at("doors")) {
         	DoorTrigger door;
@@ -104,7 +114,7 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 
 	        door.targetRoomJson = d.value("targetRoom", "");
         	if (door.targetRoomJson.empty())
-	            throw std::runtime_error("door missing targetRoom: " + jsonPath);
+	            throw std::runtime_error("[ROOM ERROR] door missing targetRoom: " + jsonPath);
 
                if (d.contains("targetSpawn"))
 		    door.targetSpawn = convertBlenderCoords(readVec3(d.at("targetSpawn"), "targetSpawn"));
@@ -117,7 +127,7 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 
 	if (j.contains("interactions")) {
 		if (!j.at("interactions").is_array())
-			throw std::runtime_error ("interactions is not an array: " + jsonPath);
+			throw std::runtime_error ("[ROOM ERROR] interactions is not an array: " + jsonPath);
 			
 		for (const auto& ji : j.at("interactions")) {
 			Interaction interaction;
@@ -147,7 +157,7 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 
 	if (j.contains("lights")) {
 		if (!j.at("lights").is_array())
-	        throw std::runtime_error("lights is not an array: " + jsonPath);
+	        throw std::runtime_error("[ROOM ERROR] lights is not an array: " + jsonPath);
 
 		for (const auto& jl : j.at("lights")) {
 		        PointLight light;
@@ -198,25 +208,34 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 	}	
 
 	if (room.cameras.empty())
-		throw std::runtime_error("Room has 0 cameras: " + jsonPath);
+		throw std::runtime_error("[ROOM ERROR] Room has 0 cameras: " + jsonPath);
 
 	if (j.contains("ambientColor")) {
 		room.ambientColor = readVec3(j.at("ambientColor"), "ambientColor");
+		{
+			std::ostringstream ss;
 
-		std::cout << "Loaded ambientColor for " << room.name << ": "
-              	        << room.ambientColor.x << ", "
-			<< room.ambientColor.y << ", "
-			<< room.ambientColor.z << "\n";	
+			ss << "[ROOM] Loaded ambientColor for " << room.name << ": "
+			   << room.ambientColor.x << ", " << room.ambientColor.y << ", "
+			   << room.ambientColor.z;
+
+			DebugLog::log(ss.str());
+		}
 	}
 	else {
 		room.ambientColor = glm::vec3(0.12f, 0.12f, 0.14f);
-		std::cout << "No ambientColor in " << room.name
-		              << ", using default.\n";
+		{
+			std::ostringstream ss;
+
+			ss << "[ROOM] No ambientColor in " << room.name << ", using default.";
+
+			DebugLog::log(ss.str());
+		}
 	}
 
 	if (j.contains("props")) {
 		if (!j.at("props").is_array())
-			throw std::runtime_error("props is not an array: " + jsonPath);
+			throw std::runtime_error("[ROOM ERROR] props is not an array: " + jsonPath);
 
 		for (const auto& jp : j.at("props")) {
 			Prop prop;
@@ -225,8 +244,7 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 			prop.modelPath = jp.value("model", "");
 
 			if (prop.modelPath.empty()) {
-				std::cerr << "WARNING: prop has empty model path in "
-						  << jsonPath << "\n";
+				DebugLog::log("[ROOM ERROR] Warning: prop has empty model path in " + jsonPath);
 				continue;
 			}
 

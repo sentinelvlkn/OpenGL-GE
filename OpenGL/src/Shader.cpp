@@ -7,6 +7,7 @@
 #include "include/Shader.h"
 //#include <unistd.h>
 #include "filesystem"
+#include "include/DebugLog.h"
 
 Shader::Shader(const char* vertexPath, const char* fragmentPath){
 	
@@ -25,11 +26,13 @@ Shader::Shader(const char* vertexPath, const char* fragmentPath){
 		char cwd[1024];
 		//getcwd(cwd, sizeof(cwd));
 		//std::string cwd = std::filesystem::current_path().string();
-		std::cout << "Working dir: " << std::filesystem::current_path() << std::endl;
-		std::cout << "Trying to read: " << vertexPath << std::endl;
+		std::filesystem::path currentPath = std::filesystem::current_path();
+		DebugLog::log("[SHADERS] Working dir: " + currentPath.string());
+
+		DebugLog::log(std::string("[VERTEX SHADER] Reading: ") + vertexPath);
 		vShaderFile.open(vertexPath);
 
-		std::cout << "Trying to read: " << fragmentPath << std::endl;
+		DebugLog::log(std::string("[FRAGMENT SHADER] Reading: ") + fragmentPath);
 		fShaderFile.open(fragmentPath);
 		std::stringstream vShaderStream, fShaderStream;
 
@@ -43,7 +46,7 @@ Shader::Shader(const char* vertexPath, const char* fragmentPath){
 		fragmentCode = fShaderStream.str();
 	}
 	catch(std::ifstream::failure& e){
-		std::cout << "Error: Shader: File not successfully read: " <<e.what() << std::endl;
+		DebugLog::log(std::string("[SHADER ERROR] Reading shader file failed: ") + e.what());
 	}
 
 	const char* vShaderCode = vertexCode.c_str();
@@ -141,16 +144,20 @@ void Shader::checkCompileErrors(GLuint shader, std::string type){
 	GLchar infoLog[1024];
 	
 	if(type != "PROGRAM"){
+		
 		glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-		if(!success){
+		if(!success) {
 			glGetShaderInfoLog(shader, 1024, NULL, infoLog);
-			std::cout << "Error: Shader compilation error of type: " << type << "\n" << infoLog << std::endl;
-			}
+				DebugLog::log(std::string("[SHADER COMPILATION ERROR] Type: ") + std::string(type) + "\n" + std::string(infoLog));
+		}
+
 	}else{
+
 		glGetProgramiv(shader, GL_LINK_STATUS, &success);
-		if(!success){
+		if(!success) {
 			glGetProgramInfoLog(shader, 1024, NULL, infoLog);
-			std::cout << "Error: Program linking error of type: " <<type << "\n" << infoLog << std::endl;
-			}	
+				DebugLog::log(std::string("[SHADER LINKING ERROR] Type: ") + std::string(type) + "\n" + std::string(infoLog));
+		}
+
 	}
 }
