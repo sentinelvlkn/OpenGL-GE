@@ -17,6 +17,10 @@ add_executable(${PROJECT_NAME}
     src/Input.cpp
     src/PlayerMovement.cpp
     src/InteractionSystem.cpp
+    src/DebugTerminal.cpp
+    src/AssetCache.cpp
+    src/LightingSystem.cpp
+    src/TextureUtilities.cpp
     
     src/stb_image_impl.cpp
   "src/glad.c" "src/include/Room.h" "src/Room.cpp" "src/include/Prop.h")

@@ -11,11 +11,15 @@
 #include "include/Player.h"
 #include "include/Interaction.h"
 #include "include/InteractionSystem.h"
+#include "include/AssetCache.h"
+#include "include/LightingSystem.h"
+#include "include/TextureUtilities.h"
 #include "stb_image.h"
 #include "include/FileSystem.h"
 #include "include/TextRenderer.h"
 #include "include/UiRenderer.h"
 #include "include/DebugLog.h"
+#include "include/DebugTerminal.h"
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
@@ -37,20 +41,7 @@ static void updateRoomCamera(Room& room, const Player& player, Camera& camera);
 static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& roomModel, Model& playerModel, const Player& player, const Room& room, Camera& camera);
 static void renderScreen(unsigned int quadVAO, Shader& screenShader, unsigned int textureColorBuffer, float time);
 static void runInteraction(Interaction& interaction);
-static unsigned int loadTexture2D(const char* path);
-static Model& getRoomModel(const Room& room);
-static Model& getCachedModel(const std::string &modelPath);
-static float hashFloat(float x);
-static float noise1D(float x);
-static float calculateFlickerMultiplier(const PointLight& light, float time, int lightIndex);
-static void updateLightningDebugInput(GLFWwindow *window, float deltaTime);
-static void resizeFramebufferAttachments(unsigned int fbo, unsigned int textureColorBuffer,
-										 unsigned int rbo);
-static std::vector<std::string> wrapTextWidth(const std::string& text, TextRenderer& textRenderer, float scale, float maxWidth);
-static void drawDebugTerminal(UiRenderer &uiRenderer, Shader &uiRectangleShader,
-							  TextRenderer &textRenderer, Shader &textShader,
-							  int screenWidth, int screenHeight);
-
+static void resizeFramebufferAttachments(unsigned int fbo, unsigned int textureColorBuffer, unsigned int rbo);
 
 int WIDTH = 800;
 int HEIGHT = 600;
@@ -61,8 +52,6 @@ static bool gFramebufferResized = false;
 
 void glfwErrorCallback(int error, const char* description);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-unsigned int loadTexture(const char* path);
-unsigned int loadCubemap(std::vector<std::string> faces);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
@@ -76,12 +65,8 @@ float lastFrame = 0.0f;
 
 static bool debugTerminalOpen = false;
 
-//light debug variables
-static float debugForcedLightningTimer = 0.0f;
-static bool debugLightningPreview = false; //keeps spotlight visible
-static bool debugDisableFlicker = false;  
-static bool debugPrintLightInformation = false;
-static bool debugSpotAsPoint = false; // turn spotlight to point light
+//light debug 
+static LightingDebugState lightingDebugState;
 
 //for scene fade in and fade out
 float fade = 1.0f;
@@ -95,9 +80,6 @@ static std::string activeMessage;
 static bool noteOpen = false;
 static std::string activeNoteImagePath;
 static unsigned int activeNoteTexture = 0;
-
-static std::unordered_map<std::string, std::unique_ptr<Model>> roomModelCache;
-static std::unordered_map<std::string, std::unique_ptr<Model>> modelCache;
 
 int main()
 {
@@ -314,7 +296,7 @@ int main()
 			resizeFramebufferAttachments(framebuffer ,textureColorBuffer, RBO);
 
     	processInput(window, fade, fadeIn, fadeOut);
-		updateLightningDebugInput(window, deltaTime);
+		updateLightningDebugInput(window, deltaTime, lightingDebugState);
 
 		if (keyPressedOnce(window, GLFW_KEY_F1))
 			debugTerminalOpen = !debugTerminalOpen;
@@ -483,7 +465,9 @@ int main()
 							textRenderer, 
 							textShader,
 							gFramebufferWidth, 
-							gFramebufferHeight);
+							gFramebufferHeight,
+							debugTerminalOpen					
+		);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -500,7 +484,6 @@ int main()
     return 0;
 }
 
-
 void glfwErrorCallback(int error, const char* description){
 	std::cerr << "GLFW error " << error << ": " << description << std::endl;
 }
@@ -512,71 +495,6 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height){
 	gFramebufferWidth = width;
 	gFramebufferHeight = height;
 	gFramebufferResized = true;
-}
-
-
-unsigned int loadTexture(const char* path){ //load 2D texture from file
-	unsigned int textureID;
-	glGenTextures(1, &textureID);
-	
-	int width, height, nrComponents;
-	unsigned char* data = stbi_load(path, &width, &height, &nrComponents, 0);
-	if(data){
-		GLenum format = GL_RGB;
-		switch(nrComponents){
-			case 1: format = GL_RED; break;
-			case 3: format = GL_RGB; break;
-			case 4: format = GL_RGBA; break;
-			default: break; 
-		}
-		
-		glBindTexture(GL_TEXTURE_2D, textureID);
-		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-		glGenerateMipmap(GL_TEXTURE_2D);
-		
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		
-		stbi_image_free(data);
-	}
-	else {
-		DebugLog::log(std::string("[TEXTURE LOAD ERROR] Texture failed to load at path: ") + path);
-		stbi_image_free(data);
-	}
-	
-	return textureID;
-}
-
- //loads a cubemap texture from 6 individual texture faces in order:
- //+X (right) -X (left)
- //+Y (top) -Y (bottom)
- //+Z (front) -Z (back)
-unsigned int loadCubemap(std::vector<std::string> faces){
-	unsigned int textureID;
-	glGenTextures(1, &textureID);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
-	int width, height, nrChannels;
-	for(unsigned int i=0; i<faces.size(); i++){
-		unsigned char* data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
-		if(data){
-			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-			stbi_image_free(data);
-		}
-		else{
-			DebugLog::log("[CUBEMAP ERROR] Failed to load texture: " + faces[i]);
-			stbi_image_free(data);
-		}
-	}
-	
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-	
-	return textureID;
 }
 
 void mouse_callback(GLFWwindow* window, double xposIn, double yposIn){
@@ -619,7 +537,6 @@ static void updateFade(float deltaTime) {
 
 	fade = glm::clamp(fade, 0.0f, 1.0f);
 }
-
 	
 static void updateRoomCamera(Room& room, const Player& player, Camera& camera){
 	roomCameraSwitch(room, player.position);
@@ -654,7 +571,7 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 	int numPointLights = 0;
 	int numSpotLights = 0;
 	
-	bool shouldPrintLightDebug = debugPrintLightInformation;
+	bool shouldPrintLightDebug = lightingDebugState.printLightInformation;
 
 	if (!room.lights.empty()) {
 
@@ -663,7 +580,7 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 
 			float t = static_cast<float>(glfwGetTime());
 
-			float multiplier = calculateFlickerMultiplier(light, t, i);
+			float multiplier = calculateFlickerMultiplier(light, t, i, lightingDebugState);
 			float intensity = light.intensity * multiplier;
 
 			if (shouldPrintLightDebug) {
@@ -679,7 +596,7 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 				DebugLog::log(ss.str());
 			}
 
-			if (light.type == "spot" && !debugSpotAsPoint) {
+			if (light.type == "spot" && !lightingDebugState.spotAsPoint) {
 				if (numSpotLights >= MAX_SPOT_LIGHTS) {
 					DebugLog::log("[LIGHT WARNING] Maximum number of spot lights reached. Ignoring additional spot light.");
 					continue;
@@ -742,8 +659,8 @@ static void renderSceneToFBO(unsigned int framebuffer, Shader& shader, Model& ro
 
 			}
 
-			if (debugPrintLightInformation)
-				debugPrintLightInformation = false;
+			if (lightingDebugState.printLightInformation)
+				lightingDebugState.printLightInformation = false;
 		}
 	}
 	else {
@@ -950,176 +867,6 @@ static void runInteraction(Interaction& interaction){
 	interaction.used = true;
 }
 
-//intial idea for this function is to load notes on screen
-//related to Interactions xoxoxox
-static unsigned int loadTexture2D(const char* path) {
-
-	unsigned int textureID;
-	glGenTextures(1, &textureID);
-	
-	int width, height, nrComponents;
-	stbi_set_flip_vertically_on_load(true);
-
-	unsigned char* data = stbi_load(path, &width, &height, &nrComponents, 0);
-
-	if (data) {
-		GLenum format = GL_RGB;
-		
-		switch (nrComponents) {
-			case 1: format = GL_RED; break;
-
-			case 3: format = GL_RGB; break;
-		
-			case 4: format = GL_RGBA; break;
-
-			default: format = GL_RGB; break;
-		}
-
-		glBindTexture(GL_TEXTURE_2D, textureID);
-
-		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-
-		glGenerateMipmap(GL_TEXTURE_2D);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	
-		stbi_image_free(data);
-	}
-	else {
-		DebugLog::log(std::string("[UI TEXTURE ERROR] Failed to load: ") + path);
-		stbi_image_free(data);
-	}
-	
-	return textureID;
-}
-
-static Model& getRoomModel(const Room& room){
-	std::string path = FileSystem::pathFromRoot(room.modelPath);
-
-	auto it = roomModelCache.find(path);
-	if (it == roomModelCache.end()) {
-		roomModelCache[path] = std::make_unique<Model>(path.c_str());
-		return *roomModelCache[path];
-	}
-
-	return *it->second;
-}
-
-static float hashFloat(float x) {
-	return glm::fract(sin(x * 12.9898f) * 43758.5453f);
-}
-
-static float noise1D(float x) {
-	float i = floor(x);
-	float f = glm::fract(x);
-
-	float a = hashFloat(i);
-	float b = hashFloat(i + 1.0f);
-
-	float u = f * f * (3.0f - 2.0f * f);
-
-	return glm::mix(a, b, u);
-}
-
-static float calculateFlickerMultiplier(const PointLight& light, float time, int lightIndex) {
-	if (debugDisableFlicker)
-		return 1.0f;
-
-	if (light.flickerType == "lightning") {
-		if (debugForcedLightningTimer > 0.0f)
-			return light.flickerStrength * 4.0f;
-
-		if (debugLightningPreview)
-			return 1.0f;
-	}
-	
-	if (!light.flicker)
-		return 1.0f;
-
-	float freq = glm::max(light.flickerFrequency, 0.001f);
-	float strength = glm::clamp(light.flickerStrength, 0.0f, 1.0f);
-	float randomness = glm::clamp(light.flickerRandomness, 0.0f, 1.0f);
-
-	float phase = lightIndex * 17.31f;
-	float x = time * freq + phase;
-
-	if (light.flickerType == "fluorescent") { //fast small pulse like worn out halogen tubes
-		float pulse = 0.5f + 0.5f * sin(x * 6.28318f);
-
-		float noise = noise1D(x * 2.7f) * 2.0f - 1.0f;
-
-		float variation = (pulse - 0.5f) * strength + noise * strength * randomness;
-
-		return glm::clamp(1.0f + variation, 0.15f, 1.35f);
-	}
-
-	if (light.flickerType == "tungsten") { //irregular voltage incadescnet
-		float slow = sin(x * 6.283f) * 0.5f;
-
-		float n = noise1D(x * 1.35f) * 2.0f - 1.0f;
-
-		float variation = slow * strength * 0.45f + n * strength * randomness;
-
-		return glm::clamp(1.0f + variation, 0.25f, 1.25f);
-	}
-
-	if (light.flickerType == "lightning") { //thunderstorm, occasional flash
-		float n = noise1D(x);
-
-		if (n < light.flickerThreshold)
-			return 0.0f;
-
-		float flashAmount = (n - light.flickerThreshold) / glm::max(1.0f - light.flickerThreshold, 0.001f);
-
-		float strobe = 0.65f + 0.35f * sin(time * 80.0f + phase); // rapid pulse after initial lightning to simulate
-										// several flashes
-
-		return glm::clamp(flashAmount * strobe * strength * 4.0f, 0.0f, 4.0f);
-	}
-	
-	//default sine flicker
-	float simple = 0.85f + 0.15f * sin(time * freq + phase);
-	return glm::mix(1.0f, simple, strength);
-}
-
-static void updateLightningDebugInput(GLFWwindow* window, float deltatime) {
-	if (keyPressedOnce(window, GLFW_KEY_F5)) {
-		debugForcedLightningTimer = 0.25f;
-		DebugLog::log("[LIGHT DEBUG] Forced lightning flash triggered");
-	}
-
-	if (keyPressedOnce(window, GLFW_KEY_F6)) {
-		debugLightningPreview = !debugLightningPreview;
-		DebugLog::log(std::string("[LIGHT DEBUG] Lightning preview ") + (debugLightningPreview ? "ON" : "OFF") );
-	}
-
-	if (keyPressedOnce(window, GLFW_KEY_F7)) {
-		debugDisableFlicker = !debugDisableFlicker;
-		DebugLog::log(std::string("[LIGHT DEBUG] Disable flicker: ") + (debugDisableFlicker ? "ON" : "OFF"));
-	}
-	
-	if (keyPressedOnce(window, GLFW_KEY_F8)) {
-		debugPrintLightInformation = !debugPrintLightInformation;
-		DebugLog::log(std::string("[LIGHT DEBUG] Print light information: ") + (debugPrintLightInformation ? "ON" : "OFF"));
-	}
-
-	if (keyPressedOnce(window, GLFW_KEY_F9)) {
-		debugSpotAsPoint = !debugSpotAsPoint;
-		DebugLog::log(std::string("[LIGHT DEBUG] Spot as point: ") + (debugSpotAsPoint ? "ON" : "OFF"));
-	}
-
-	if (debugForcedLightningTimer > 0.0f) {
-		debugForcedLightningTimer -= deltatime;
-		if (debugForcedLightningTimer <= 0.0f) {
-			debugForcedLightningTimer = 0.0f;
-			DebugLog::log("[LIGHT DEBUG] Forced lightning flash ended");
-		}
-	}
-}
-
 static void resizeFramebufferAttachments(unsigned int fbo, unsigned int textureColorBuffer, unsigned int rbo) {
 	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
@@ -1161,194 +908,3 @@ static void resizeFramebufferAttachments(unsigned int fbo, unsigned int textureC
 	DebugLog::log("[FBO RESIZE] Framebuffer: " + std::to_string(gFramebufferWidth) + "x" + std::to_string(gFramebufferHeight));
 }
 
-static Model& getCachedModel(const std::string& modelPath) {
-
-	if (modelPath.empty()) {
-		throw std::runtime_error("[CACHE MODEL ERROR] getCachedModel called with empty modelPath");
-	}
-
-	std::string path = FileSystem::pathFromRoot(modelPath);
-
-	auto it = modelCache.find(path);
-
-	if (it == modelCache.end()) {
-		DebugLog::log("[MODEL CACHE] Loading: " + path);
-
-		auto model = std::make_unique<Model>(path.c_str());
-		auto result = modelCache.emplace(path, std::move(model));
-
-		it = result.first;
-	}
-
-	if (!it->second) {
-		throw std::runtime_error("[CACHE MODEL ERROR] Cached model is null: " + path);
-	}
-
-	return *it->second;
-}
-
-//wraps by words first and then breaks long words if necessary
-static std::vector<std::string> wrapTextWidth(
-												const std::string& text,
-												TextRenderer& textRenderer,
-												float scale, 
-												float maxWidth) {
-	std::vector<std::string> result;
-
-	if (text.empty()) {
-		result.push_back("");
-		return result;
-	}
-
-	std::istringstream stream(text);
-	std::string word;
-	std::string currentLine;
-
-	while (stream >> word) {
-		std::string candidate;
-
-		if (currentLine.empty())
-			candidate = word;
-		else
-			candidate = currentLine + " " + word;
-
-		if (textRenderer.measureTextWidth(candidate, scale) <= maxWidth)
-			currentLine = candidate;
-		
-		else {
-		
-			if (!currentLine.empty()) {
-				result.push_back(currentLine);
-				currentLine.clear();
-			}
-
-			if (textRenderer.measureTextWidth(word, scale) <= maxWidth)
-				currentLine = word;
-			else {
-				std::string chunk;
-
-				for (char c : word) {
-					std::string chunkCandidate = chunk + c;
-
-					if (textRenderer.measureTextWidth(chunkCandidate, scale) > maxWidth && !chunk.empty()) {
-						result.push_back(chunk);
-						chunk = std::string(1, c);
-					} else
-						chunk = chunkCandidate;
-				}
-				
-				currentLine = chunk;
-			}
-		}
-	}
-
-	if (!currentLine.empty())
-		result.push_back(currentLine);
-
-	return result;
-
-}
-
-static void drawDebugTerminal(UiRenderer &uiRenderer, Shader &uiRectangleShader,
-							  TextRenderer &textRenderer, Shader &textShader,
-							  int screenWidth, int screenHeight) {
-
-	if (!debugTerminalOpen)
-		return;
-
-	float sw = static_cast<float>(screenWidth);
-	float sh = static_cast<float>(screenHeight);
-
-	float panelMargin = 20.0f;
-
-	float panelX = panelMargin;
-	float panelW = sw - panelMargin * 2.0f;
-
-	if (panelW < 240.0f) panelW = 240.0f;
-
-	float panelH = sh * 0.38f;
-
-	if (panelH < 140.0f) panelH = 140.0f;
-	if (panelH > 360.0f) panelH = 360.0f;
-
-	float panelY = sh - panelH - panelMargin;
-
-	uiRenderer.drawRectangle(	uiRectangleShader, 
-								panelX,	
-								panelY, 
-								panelW, 
-								panelH, 
-								glm::vec3(0.0f, 0.0f, 0.0f), 
-								0.78f, 
-								screenWidth,
-								screenHeight
-	);
-
-	float textScale = 0.65f;
-	float padding = 14.0f;
-	float lineHeight = 17.0f;
-
-	textRenderer.renderText(	textShader, 
-								"DEBUG TERMINAL [F1]", 
-								panelX + padding,
-								panelY + panelH - 28.0f, 
-								textScale,
-								glm::vec3(0.75f, 1.0f, 0.75f), 
-								screenWidth,
-								screenHeight
-	);
-
-	const std::vector<std::string> &lines = DebugLog::getLines();
-
-	if (lines.empty()) {
-
-		textRenderer.renderText(	textShader, 
-									"No debug messages yet.",
-									panelX + padding, 
-									panelY + panelH - 55.0f,
-									textScale, 
-									glm::vec3(0.85f, 0.9f, 0.85f),
-									screenWidth, 
-									screenHeight
-		);
-
-		return;
-	}
-
-	float maxTextWidth = panelW - padding * 2.0f;
-	float startY = panelY + panelH - 55.0f;
-	float bottomY = panelY + padding;
-
-	std::vector<std::string> wrappedLines;
-
-	for (const std::string &line : lines) {
-		std::vector<std::string> wrapped = wrapTextWidth(line, textRenderer, textScale, maxTextWidth);
-		wrappedLines.insert(wrappedLines.end(), wrapped.begin(), wrapped.end());
-	}
-
-	int maxVisibleLines = static_cast<int>((startY - bottomY) / lineHeight);
-	if (maxVisibleLines <= 0)
-		return;
-
-	int startIndex = glm::max(0, static_cast<int>(wrappedLines.size()) - maxVisibleLines);
-
-	float y = startY;
-
-	for (int i = startIndex; i < (int)wrappedLines.size(); ++i) {
-		textRenderer.renderText(	
-									textShader, 
-									wrappedLines[i], 
-									panelX + padding, 
-									y, 
-									textScale,
-									glm::vec3(0.85f, 0.9f, 0.85f), 
-									screenWidth, 
-									screenHeight
-		);
-
-		y -= lineHeight;
-
-		if (y < bottomY)
-			break;
-	}
-}
