@@ -1,4 +1,9 @@
+#include <glad/glad.h>
+
+#include "include/DebugLog.h"
+#include "include/FileSystem.h"
 #include "include/InteractionSystem.h"
+#include "include/TextureUtilities.h"
 
 std::string getInteractionPromptText(const Interaction &interaction) {
 	switch (interaction.type) {
@@ -60,4 +65,82 @@ Interaction *getInteractionInRange(Room &room, const glm::vec3 &playerPos) {
 	}
 
 	return nullptr;
+}
+
+void closeActiveInteraction(InteractionRuntimeState& interactionState) {
+	interactionState.messageOpen = false;
+	interactionState.activeMessage.clear();
+
+	interactionState.noteOpen = false;
+	interactionState.activeNoteImagePath.clear();
+
+	if (interactionState.activeNoteTexture != 0) {
+		glDeleteTextures(1, &interactionState.activeNoteTexture);
+		interactionState.activeNoteTexture = 0;
+	}
+
+	DebugLog::log("[MESSAGE CLOSED]");
+}
+
+void runInteraction(Interaction &interaction, InteractionRuntimeState& interactionState) {
+	
+	switch (interaction.type) {
+	case InteractionType::Message:
+		interactionState.activeMessage = interaction.message;
+		interactionState.messageOpen = true;
+
+		DebugLog::log("[MESSAGE] " + interaction.message);
+		DebugLog::log("[MESSAGE] Press E to close.");
+
+		break;
+
+	case InteractionType::Note:
+		interactionState.noteOpen = true;
+		interactionState.messageOpen = true;
+
+		interactionState.activeNoteImagePath = interaction.assetPath;
+
+		if (interactionState.activeNoteTexture != 0) {
+			glDeleteTextures(1, &interactionState.activeNoteTexture);
+			interactionState.activeNoteTexture = 0;
+		}
+
+		interactionState.activeNoteTexture = loadTexture2D(
+			FileSystem::pathFromRoot(interactionState.activeNoteImagePath).c_str()
+		);
+
+		DebugLog::log("[NOTE] Opened: " + interactionState.activeNoteImagePath);
+		DebugLog::log("[NOTE] Press E to close.");
+
+		break;
+
+	case InteractionType::Pickup:
+		interactionState.activeMessage = "Picked up: " + interaction.targetId;
+		interactionState.messageOpen = true;
+
+		DebugLog::log("[PICKUP] Picked up: " + interaction.targetId);
+		DebugLog::log("[PICKUP] Press E to close.");
+
+		break;
+
+	case InteractionType::Switch:
+		interactionState.activeMessage = "Triggered: " + interaction.targetId;
+		interactionState.messageOpen = true;
+
+		DebugLog::log("[SWITCH] Triggered: " + interaction.targetId);
+		DebugLog::log("[SWITCH] Press E to close.");
+
+		break;
+
+	default:
+		interactionState.activeMessage = "Unknown interaction: " + interaction.id;
+		interactionState.messageOpen = true;
+
+		DebugLog::log("[INTERACTION] Unknown interaction: " + interaction.id);
+		DebugLog::log("[INTERACTION] Press E to close.");
+
+		break;
+	}
+
+	interaction.used = true;
 }
