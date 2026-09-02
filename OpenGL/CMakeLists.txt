@@ -28,6 +28,7 @@ add_executable(${PROJECT_NAME}
     src/CameraSystem.cpp
     src/GameplaySystem.cpp
     src/GameUIRenderer.cpp
+    src/DebugInputSystem.cpp
     
     src/stb_image_impl.cpp
   "src/glad.c" "src/include/Room.h" "src/Room.cpp" "src/include/Prop.h")
@@ -40,6 +41,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}"
+    GLFW_INCLUDE_NONE
 )
 
 set_property(TARGET ${PROJECT_NAME}

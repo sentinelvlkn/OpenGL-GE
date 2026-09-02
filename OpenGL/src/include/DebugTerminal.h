@@ -1,9 +1,10 @@
 #pragma once
 
-#include "Shader.h"
-#include "TextRenderer.h"
-#include "UiRenderer.h"
+struct UiRenderer;
+struct Shader;
+struct TextRenderer;
+struct AppState;
 
 void drawDebugTerminal(	UiRenderer &uiRenderer, Shader &uiRectangleShader,
 						TextRenderer &textRenderer, Shader &textShader,
-						int screenWidth, int screenHeight, bool open);
+						const AppState &appState);

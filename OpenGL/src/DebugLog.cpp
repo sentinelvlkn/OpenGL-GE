@@ -27,16 +27,4 @@ const std::vector<std::string> &getLines() { return gLines; }
 
 void clear() { gLines.clear(); }
 
-void F2DebugPrint(const Room& testRoom, const Player& player) {
-	std::ostringstream ss;
-
-	ss << "Room: " << testRoom.name << " | Player: " << player.position.x
-	   << ", " << player.position.y << ", " << player.position.z
-	   << " | Camera: " << testRoom.activeCamera
-	   << " | Props: " << testRoom.props.size()
-	   << " | Lights: " << testRoom.lights.size();
-
-	DebugLog::log(ss.str());
-}
-
 } // namespace DebugLog

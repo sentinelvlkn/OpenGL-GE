@@ -1,8 +1,11 @@
 #pragma once
 
-void resizeFramebufferAttachments(	unsigned int fbo,
+struct AppState;
+
+void resizeFramebufferAttachments(	
+									unsigned int fbo,
 									unsigned int textureColorBuffer,
 									unsigned int rbo, 
-									int width, int height
+									AppState& appState
 );
 

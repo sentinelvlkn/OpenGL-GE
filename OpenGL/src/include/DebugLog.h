@@ -13,7 +13,6 @@ namespace DebugLog {
 	const std::vector<std::string> &getLines();
 
 	void clear();
-	void F2DebugPrint(const Room &testRoom, const Player &player);
 
 } 
 

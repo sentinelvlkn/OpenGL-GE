@@ -21,6 +21,9 @@
 #include "include/CameraSystem.h"
 #include "include/GameplaySystem.h"
 #include "include/GameUIRenderer.h"
+#include "include/DebugInputSystem.h"
+#include "include/AppState.h"
+#include "include/GameState.h"
 #include "glm/glm.hpp"
 #include <vector>
 #include <sstream>
@@ -28,12 +31,8 @@
 #include <iostream>
 #include "include/test_vertices.h"
 
-int WIDTH = 800;
-int HEIGHT = 600;
-
-static int gFramebufferWidth = WIDTH;
-static int gFramebufferHeight = HEIGHT;
-static bool gFramebufferResized = false;
+constexpr int INITIAL_WIDTH = 800;
+constexpr int INITIAL_HEIGHT = 600;
 
 void glfwErrorCallback(int error, const char* description);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -41,23 +40,12 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
 Camera camera(glm::vec3(0.0f, 0.0f, 5.0f));
-float lastX = (float)gFramebufferWidth / 2.0;
-float lastY = (float)gFramebufferHeight / 2.0;
+float lastX = INITIAL_WIDTH * 0.5;
+float lastY = INITIAL_HEIGHT * 0.5;
 bool firstMouse = true;
 
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
-
-static bool debugTerminalOpen = false;
-
-static RoomTransitionState roomTransitionState;
-
-//light debug 
-static LightingDebugState lightingDebugState;
-
-static FadeState fadeState;
-
-static InteractionRuntimeState interactionState;
 
 int main()
 {
@@ -68,31 +56,40 @@ int main()
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
 	//window create
-	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "OPENGL", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(INITIAL_WIDTH, INITIAL_HEIGHT, "OPENGL", NULL, NULL);
 	if(window == NULL){
 		std::cout << "Failed to create GLFW window" << std::endl;
 		glfwTerminate();
 		return -1;
 	}
+
+	AppState appState;
+	GameState gameState;
 	
 	glfwMakeContextCurrent(window);
+	glfwSetWindowUserPointer(window, &appState);
+
 	glfwSetErrorCallback(glfwErrorCallback);
+
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-	glfwGetFramebufferSize(window, &gFramebufferWidth, &gFramebufferHeight);
+	glfwGetFramebufferSize(window, &appState.framebufferWidth, &appState.framebufferHeight);
 	//glfwSetCursorPosCallback(window, mouse_callback);
 	//glfwSetScrollCallback(window, scroll_callback);
 
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	
 	//load glad
-	if(!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)){
+	bool gladLoaded = gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+
+	if (!gladLoaded) {
 		std::cout << "Failed to load GLAD" << std::endl;
 		return -1;
 	}
-	
-	std::cout << "GLAD load: " << (gladLoadGLLoader((GLADloadproc)glfwGetProcAddress) ? "OK" : "FAIL")<< "\n";
+
+	std::cout << "GLAD load: OK\n";
 	std::cout << "GL_VERSION: " << glGetString(GL_VERSION) << "\n";
-	
+
+
 	glEnable(GL_DEPTH_TEST);
 		
 	Shader shader( 
@@ -122,36 +119,20 @@ int main()
 
 	DebugLog::log("Debug terminal ready. Press F1 to toggle. Press F2 to print player state.");
 
-	Room testRoom = loadRoomFromJson(
+	gameState.room = loadRoomFromJson(
 		FileSystem::pathFromRoot("src/models/test_room/test_room.json").c_str()
 	);
 
-
-	for (int i = 0; i < testRoom.cameras.size(); ++i) {
-    		auto& c = testRoom.cameras[i];
-			{
-				std::ostringstream ss;
-
-				ss << "Cam " << i << " min(" << c.aabbMin.x << ","
-				   << c.aabbMin.y << "," << c.aabbMin.z << ") "
-				   << "max(" << c.aabbMax.x << "," << c.aabbMax.y << ","
-				   << c.aabbMax.z << ")";
-
-				DebugLog::log(ss.str());
-			}
-			
-	}
-	
-
-	Model* testRoomModel = nullptr;
-	testRoomModel = &getRoomModel(testRoom);
+	gameState.roomModel = &getRoomModel(gameState.room);
 
 	Model playerModel(
 		FileSystem::pathFromRoot("src/models/test_character/test_character.obj").c_str()
 	);
 
-	Player player;
-	player.position = testRoom.playerSpawn;
+	gameState.player.position = gameState.room.playerSpawn;
+
+	roomCameraSwitch(gameState.room, gameState.player.position);
+	applyRoomCamera(gameState.room, gameState.camera);
 
 	TextRenderer textRenderer;
 	std::string fontPath = FileSystem::pathFromRoot("src/ui/fonts/LektonNerdFontMono-Regular.ttf");
@@ -190,7 +171,7 @@ int main()
 	unsigned int textureColorBuffer;
 	glGenTextures(1, &textureColorBuffer);
 	glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, gFramebufferWidth, gFramebufferHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, appState.framebufferWidth, appState.framebufferHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorBuffer, 0);
@@ -199,7 +180,7 @@ int main()
 	unsigned int RBO;
 	glGenRenderbuffers(1, &RBO);
 	glBindRenderbuffer(GL_RENDERBUFFER, RBO);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, gFramebufferWidth, gFramebufferHeight);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, appState.framebufferWidth, appState.framebufferHeight);
 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, RBO);
 	
 	//check if framebuffer was crated
@@ -221,122 +202,115 @@ int main()
 	//main game loop
 	while (!glfwWindowShouldClose(window)) {
 
-    	float currentFrame = static_cast<float>(glfwGetTime());
-    	deltaTime = currentFrame - lastFrame;
-    	lastFrame = currentFrame;
+		float currentFrame = static_cast<float>(glfwGetTime());
+		deltaTime = currentFrame - lastFrame;
+		lastFrame = currentFrame;
 
 		float time = static_cast<float>(glfwGetTime());
 
-    	deltaTime = glm::min(deltaTime, 1.0f/30.0f);
+		deltaTime = glm::min(deltaTime, 1.0f / 30.0f);
 
 		std::string promptText;
 
-		if (gFramebufferResized) {
+		if (appState.framebufferResized)
 			resizeFramebufferAttachments(
 				framebuffer,
-				textureColorBuffer, 
-				RBO, 
-				gFramebufferWidth, 
-				gFramebufferHeight
+				textureColorBuffer,
+				RBO,
+				appState
 			);
-			gFramebufferResized = false;
-		}
+		
 
-    	processInput(window, fadeState);
-		updateLightningDebugInput(window, deltaTime, lightingDebugState);
+		processInput(window, gameState.fade);
 
-		if (keyPressedOnce(window, GLFW_KEY_F1))
-			debugTerminalOpen = !debugTerminalOpen;
+		updateLightningDebugInput(window, deltaTime, gameState.lightingDebug);
 
-		if (keyPressedOnce(window, GLFW_KEY_F2))
-			DebugLog::F2DebugPrint(testRoom, player);
-
-    	updateFade(fadeState, deltaTime);
-
-		updateRoomTransition(
-			roomTransitionState,
-			fadeState,
-			testRoom,
-			testRoomModel,
-			player,
-			camera
+		updateDebugInput(
+			window,
+			appState,
+			gameState
 		);
 
-    	// Gameplay only when not transitioning
-		promptText = updateGameplay(
-			window,
-			testRoom,
-			player,
-			camera,
-			roomTransitionState,
-			fadeState,
-			interactionState,
+		updateFade(
+			gameState.fade,
 			deltaTime
 		);
 
-		if (!roomTransitionState.transitioning)
-			updateRoomCamera(testRoom, player, camera);
-    
-   		static int lastCam = -1;
-		if (testRoom.activeCamera != lastCam) {
-			DebugLog::log("[CAMERA] Active camera: " + std::to_string(testRoom.activeCamera));
-        	lastCam = testRoom.activeCamera;
+		updateRoomTransition(
+			gameState.roomTransition,
+			gameState.fade,
+			gameState.room,
+			gameState.roomModel,
+			gameState.player,
+			gameState.camera
+		);
+
+		promptText = updateGameplay(
+			window,
+			gameState.room,
+			gameState.player,
+			gameState.camera,
+			gameState.roomTransition,
+			gameState.fade,
+			gameState.interaction,
+			deltaTime
+		);
+
+		if (!gameState.roomTransition.transitioning) {
+			updateRoomCamera(
+				gameState.room,
+				gameState.player,
+				gameState.camera
+			);
 		}
 
-		renderSceneToFBO(framebuffer, 
-			shader, 
-			*testRoomModel, 
-			playerModel, 
-			player, 
-			testRoom, 
-			camera, 
-			gFramebufferWidth, 
-			gFramebufferHeight, 
-			time, 
-			lightingDebugState
+		renderSceneToFBO(
+			framebuffer,
+			shader,
+			playerModel,
+			appState,
+			gameState,
+			time
 		);
 
 		renderScreen(
-			quadVAO, 
-			screenShader, 
-			textureColorBuffer, 
-			time, 
-			fadeState.value, 
-			gFramebufferWidth, 
-			gFramebufferHeight
+			quadVAO,
+			screenShader,
+			textureColorBuffer,
+			appState,
+			gameState,
+			time
 		);
 
 		drawInteractionPrompt(
 			promptText,
-			!interactionState.messageOpen && !roomTransitionState.transitioning,
+			!gameState.interaction.messageOpen && !gameState.roomTransition.transitioning,
 			uiRenderer,
 			uiRectangleShader,
 			textRenderer,
 			textShader,
-			gFramebufferWidth,
-			gFramebufferHeight,
+			appState.framebufferWidth,
+			appState.framebufferHeight,
 			promptScale
 		);
 
 		drawNoteOverlay(
-			interactionState,
+			gameState.interaction,
 			uiShader,
 			quadVAO
 		);
 
-		drawDebugTerminal(	
-			uiRenderer, 
+		drawDebugTerminal(
+			uiRenderer,
 			uiRectangleShader,
-			textRenderer, 
+			textRenderer,
 			textShader,
-			gFramebufferWidth, 
-			gFramebufferHeight,
-			debugTerminalOpen					
+			appState
 		);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
-	}	
+	}
 	
 	glDeleteVertexArrays(1, &quadVAO);
 	glDeleteBuffers(1, &quadVBO);
@@ -345,7 +319,8 @@ int main()
 		
 	glfwTerminate();
     return 0;
-}
+}	
+
 
 void glfwErrorCallback(int error, const char* description){
 	std::cerr << "GLFW error " << error << ": " << description << std::endl;
@@ -355,9 +330,14 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height){
 	if (width <= 0 || height <= 0)
 		return;
 
-	gFramebufferWidth = width;
-	gFramebufferHeight = height;
-	gFramebufferResized = true;
+	AppState *appState = static_cast<AppState *>(glfwGetWindowUserPointer(window));
+
+	if (!appState)
+		return;
+
+	appState->framebufferWidth = width;
+	appState->framebufferHeight = height;
+	appState->framebufferResized = true;
 }
 
 void mouse_callback(GLFWwindow* window, double xposIn, double yposIn){

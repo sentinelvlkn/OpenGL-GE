@@ -1,4 +1,7 @@
 #include "include/DebugTerminal.h"
+#include "include/Appstate.h"
+#include "include/TextRenderer.h"
+#include "include/UiRenderer.h"
 
 #include <sstream>
 #include <string>
@@ -72,13 +75,13 @@ static std::vector<std::string> wrapTextWidth(const std::string &text,
 
 void drawDebugTerminal(UiRenderer &uiRenderer, Shader &uiRectangleShader,
 							  TextRenderer &textRenderer, Shader &textShader,
-							  int screenWidth, int screenHeight, bool open) {
+							  const AppState& appState) {
 
-	if (!open)
+	if (!appState.debugTerminalOpen)
 		return;
 
-	float sw = static_cast<float>(screenWidth);
-	float sh = static_cast<float>(screenHeight);
+	float sw = static_cast<float>(appState.framebufferWidth);
+	float sh = static_cast<float>(appState.framebufferHeight);
 
 	float panelMargin = 20.0f;
 
@@ -98,8 +101,8 @@ void drawDebugTerminal(UiRenderer &uiRenderer, Shader &uiRectangleShader,
 	float panelY = sh - panelH - panelMargin;
 
 	uiRenderer.drawRectangle(uiRectangleShader, panelX, panelY, panelW, panelH,
-							 glm::vec3(0.0f, 0.0f, 0.0f), 0.78f, screenWidth,
-							 screenHeight);
+							 glm::vec3(0.0f, 0.0f, 0.0f), 0.78f, appState.framebufferWidth,
+							 appState.framebufferHeight);
 
 	float textScale = 0.65f;
 	float padding = 14.0f;
@@ -107,8 +110,8 @@ void drawDebugTerminal(UiRenderer &uiRenderer, Shader &uiRectangleShader,
 
 	textRenderer.renderText(textShader, "DEBUG TERMINAL [F1]", panelX + padding,
 							panelY + panelH - 28.0f, textScale,
-							glm::vec3(0.75f, 1.0f, 0.75f), screenWidth,
-							screenHeight);
+							glm::vec3(0.75f, 1.0f, 0.75f), appState.framebufferWidth,
+							appState.framebufferHeight);
 
 	const std::vector<std::string> &lines = DebugLog::getLines();
 
@@ -117,7 +120,7 @@ void drawDebugTerminal(UiRenderer &uiRenderer, Shader &uiRectangleShader,
 		textRenderer.renderText(textShader, "No debug messages yet.",
 								panelX + padding, panelY + panelH - 55.0f,
 								textScale, glm::vec3(0.85f, 0.9f, 0.85f),
-								screenWidth, screenHeight);
+								appState.framebufferWidth, appState.framebufferHeight);
 
 		return;
 	}
@@ -146,7 +149,7 @@ void drawDebugTerminal(UiRenderer &uiRenderer, Shader &uiRectangleShader,
 	for (int i = startIndex; i < (int)wrappedLines.size(); ++i) {
 		textRenderer.renderText(textShader, wrappedLines[i], panelX + padding,
 								y, textScale, glm::vec3(0.85f, 0.9f, 0.85f),
-								screenWidth, screenHeight);
+								appState.framebufferWidth, appState.framebufferHeight);
 
 		y -= lineHeight;
 

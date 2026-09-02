@@ -1,14 +1,23 @@
 #include "include/ScreenRenderer.h"
 
 #include <glad/glad.h>
+
 #include <sstream>
 #include <string>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "include/AppState.h"
+#include "include/GameState.h"
+#include "include/Shader.h"
+#include "include/Model.h"
+#include "include/Room.h"
+#include "include/Player.h"
+#include "include/Camera.h"
 #include "include/AssetCache.h"
 #include "include/DebugLog.h"
+#include "include/LightingSystem.h"
 #include "include/Light.h"
 #include "include/Prop.h"
 
@@ -19,17 +28,16 @@ namespace {
 
 
 void renderScreen(
-					unsigned int quadVAO, 
-					Shader& screenShader,
-					unsigned int textureColorBuffer, 
-					float time, 
-					float fadeValue,
-					int width, 
-					int height
+							unsigned int quadVAO, 
+							Shader& screenShader,
+							unsigned int textureColorBuffer, 
+							const AppState& appState,
+							const GameState& gameState,
+							float time
 ) {
 	
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glViewport(0, 0, width, height);
+	glViewport(0, 0, appState.framebufferWidth, appState.framebufferHeight);
 	glDisable(GL_DEPTH_TEST);
 	glDepthMask(GL_FALSE);
 
@@ -40,7 +48,7 @@ void renderScreen(
 
 	screenShader.setInt("screenTexture", 0);
 
-	screenShader.setFloat("fade", fadeValue);
+	screenShader.setFloat("fade", gameState.fade.value);
 	screenShader.setFloat("time", time);
 
 	screenShader.setFloat("vignetteStrength", 0.0f);
@@ -155,8 +163,6 @@ static void uploadRoomLights(
 				numPointLights++;
 			}
 
-			if (lightingDebugState.printLightInformation)
-				lightingDebugState.printLightInformation = false;
 		}
 	} else {
 		// if there are no lights in the room - a light will be fixed to the player
@@ -278,24 +284,25 @@ static void drawPlayer(Shader& shader, Model& playerModel, const Player& player)
 }
 
 void renderSceneToFBO(
-							unsigned int framebuffer, 
+							unsigned int framebuffer,
 							Shader& shader,
-							Model& roomModel, 
 							Model& playerModel,
-							const Player& player, 
-							const Room& room,
-							Camera& camera,
-							int fboWidth,
-							int fboHeight,
-							float time,
-							LightingDebugState& lightingDebugState 
+							const AppState& appState,
+							GameState& gameState,
+							float time
 ) {
 
-	if (fboWidth <= 0 || fboHeight <= 0)
+	if (appState.framebufferWidth <= 0 || appState.framebufferHeight <= 0)
 		return;
 
+	if (gameState.roomModel == nullptr) {
+		DebugLog::log("[RENDER ERROR] No active room model");
+		return;
+	}
+
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-	glViewport(0, 0, fboWidth, fboHeight);
+
+	glViewport(0, 0, appState.framebufferWidth, appState.framebufferHeight);
 
 	glEnable(GL_DEPTH_TEST);
 	glDepthMask(GL_TRUE);
@@ -309,36 +316,28 @@ void renderSceneToFBO(
 	glBindTexture(GL_TEXTURE_2D, 0);
 	shader.setInt("texture_diffuse1", 0);
 
-	shader.setVec3("ambientColor", room.ambientColor);
+	shader.setVec3("ambientColor", gameState.room.ambientColor);
 
-	uploadRoomLights(
-		shader,
-		room,
-		player,
-		time,
-		lightingDebugState
-	);
+	uploadRoomLights(shader, gameState.room, gameState.player, time,
+					 gameState.lightingDebug);
 
-	float aspect = static_cast<float>(fboWidth) / static_cast<float>(fboHeight);
+	float aspect = static_cast<float>(appState.framebufferWidth) /
+				   static_cast<float>(appState.framebufferHeight);
 
-	glm::mat4 projection = glm::perspective(
-		glm::radians(camera.Zoom), 
-		aspect, 
-		0.1f, 
-		100.0f
-	);
+	glm::mat4 projection = glm::perspective(glm::radians(gameState.camera.Zoom),
+											aspect, 0.1f, 100.0f);
 
-	glm::mat4 view = camera.getViewMatrix();
+	glm::mat4 view = gameState.camera.getViewMatrix();
 
 	shader.setMat4("projection", projection);
 	shader.setMat4("view", view);
 
 	glActiveTexture(GL_TEXTURE0);
 	shader.setInt("texture_diffuse1", 0);
-	
-	drawRoom(shader, roomModel);
-	drawProps(shader, room, time);
-	drawPlayer(shader, playerModel, player);
+
+	drawRoom(shader, *gameState.roomModel);
+	drawProps(shader, gameState.room, time);
+	drawPlayer(shader, playerModel, gameState.player);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

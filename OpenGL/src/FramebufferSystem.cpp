@@ -1,4 +1,5 @@
 #include "include/FramebufferSystem.h"
+#include "include/AppState.h"
 
 #include <glad/glad.h>
 
@@ -10,11 +11,10 @@ void resizeFramebufferAttachments(
 										unsigned int fbo,
 										unsigned int textureColorBuffer,
 										unsigned int rbo, 
-										int width,
-										int height
+										AppState& appState
 ) {
 
-	if (width <= 0 || height <= 0) {
+	if (appState.framebufferWidth <= 0 || appState.framebufferHeight <= 0) {
 		DebugLog::log("[FRAMEBUFFER WARNING] Ignored invalid resize dimensions");
 		return;
 	}
@@ -27,8 +27,8 @@ void resizeFramebufferAttachments(
 					GL_TEXTURE_2D, 
 					0, 
 					GL_RGB, 
-					width,
-					height, 
+					appState.framebufferWidth,
+					appState.framebufferHeight, 
 					0, 
 					GL_RGB, 
 					GL_UNSIGNED_BYTE, 
@@ -42,8 +42,8 @@ void resizeFramebufferAttachments(
 	glRenderbufferStorage(
 							GL_RENDERBUFFER, 
 							GL_DEPTH24_STENCIL8,
-							width, 
-							height
+							appState.framebufferWidth, 
+							appState.framebufferHeight
 	);
 
 	glBindRenderbuffer(GL_RENDERBUFFER, 0);
@@ -53,8 +53,10 @@ void resizeFramebufferAttachments(
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	DebugLog::log("[FBO RESIZE] Framebuffer: " + std::to_string(width) + "x" +
-		std::to_string(height)
+	appState.framebufferResized = false;
+
+	DebugLog::log("[FBO RESIZE] Framebuffer: " + std::to_string(appState.framebufferWidth) + "x" +
+		std::to_string(appState.framebufferHeight)
 	);
 
 }

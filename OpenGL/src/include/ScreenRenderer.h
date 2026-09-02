@@ -1,32 +1,27 @@
 #pragma once
 
-#include "Shader.h"
-#include "Model.h"
-#include "Player.h"
-#include "Room.h"
-#include "Camera.h"
-#include "LightingSystem.h"
+
+class Shader;
+class Model;
+
+struct AppState;
+struct GameState;
 
 void renderScreen(
 							unsigned int quadVAO, 
-							Shader &screenShader,
+							Shader& screenShader,
 							unsigned int textureColorBuffer, 
-							float time,
-							float fadeValue, 
-							int width, 
-							int height
+							const AppState& appState,
+							const GameState& gameState,
+							float time
 );
 
+
 void renderSceneToFBO(
-							unsigned int framebuffer, 
+							unsigned int framebuffer,
 							Shader& shader,
-							Model& roomModel, 
 							Model& playerModel,
-							const Player& player, 
-							const Room& room,
-							Camera& camera,
-							int fboWidth,
-							int fboHeight,
-							float time,
-							LightingDebugState& lightingDebugState
+							const AppState& appState,
+							GameState& gameState,
+							float time
 );
