@@ -1,4 +1,6 @@
 #include "include/FadeSystem.h"
+#include "include/AppState.h"
+#include "include/GameState.h"
 
 #include <glm/common.hpp>
 
@@ -22,6 +24,14 @@ void updateFade(FadeState &fadeState, float deltaTime) {
 	}
 
 	fadeState.value = glm::clamp(fadeState.value, 0.0f, 1.0f);
+}
+
+void updateFade(GameState &gameState, float deltaTime) {
+	updateFade(gameState.fade, deltaTime);
+}
+
+void updateFade(GameState &gameState, const AppState &appState) {
+	updateFade(gameState.fade, appState.timing.deltaTime);
 }
 
 void beginFadeToBlack(FadeState &fadeState) {

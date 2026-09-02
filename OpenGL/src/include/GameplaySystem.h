@@ -3,21 +3,17 @@
 #include <string>
 
 struct GLFWwindow;
-
-#include "Room.h"
-#include "Player.h"
-#include "Camera.h"
-#include "FadeSystem.h"
-#include "InteractionSystem.h"
-#include "RoomTransitionSystem.h"
+struct AppState;
+struct GameState;
 
 std::string updateGameplay(
                             GLFWwindow* window,
-                            Room& room,
-                            Player& player,
-                            const Camera& camera,
-                            RoomTransitionState& roomTransitionState,
-                            FadeState& fadeState,
-                            InteractionRuntimeState& interactionState,
+                            GameState& gameState,
                             float deltaTime
+);
+
+std::string updateGameplay(
+                            GLFWwindow* window,
+                            const AppState& appState,
+                            GameState& gameState
 );

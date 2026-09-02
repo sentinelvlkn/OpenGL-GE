@@ -1,21 +1,41 @@
 #include "include/GameUIRenderer.h"
 
+#include <glad/glad.h>
+
+#include <glm/glm.hpp>
+
+#include "include/AppState.h"
+#include "include/GameState.h"
+#include "include/InteractionSystem.h"
+#include "include/Shader.h"
+#include "include/TextRenderer.h"
+#include "include/UiRenderer.h"
+
 void drawInteractionPrompt(
-                            const std::string& promptText,
-                            bool shouldDraw,
-                            UiRenderer& uiRenderer,
-                            Shader& uiRectangleShader,
-                            TextRenderer& textRenderer,
-                            Shader& textShader,
-                            int screenWidth,
-                            int screenHeight,
-                            float promptScale) {
+							const std::string& promptText,
+							UiRenderer& uiRenderer,
+							Shader& uiRectangleShader,
+							TextRenderer& textRenderer,
+							Shader& textShader,
+							const AppState& appState,
+							const GameState& gameState,
+							float promptScale
+) {
+    
+	if (promptText.empty())
+		return;
 	
-    if (!shouldDraw)
+    if (gameState.interaction.messageOpen)
 		return;
 
-    if (promptText.empty())
+	if (gameState.interaction.noteOpen)
 		return;
+
+	if (gameState.roomTransition.transitioning)
+		return;
+
+	float screenWidth = static_cast<float>(appState.framebufferWidth);
+	float screenHeight = static_cast<float>(appState.framebufferHeight);
 
 	float promptWidth = textRenderer.measureTextWidth(promptText, promptScale);
     float promptX = (screenWidth * 0.5f) - (promptWidth * 0.5f);
@@ -53,14 +73,13 @@ void drawInteractionPrompt(
 }
 
 void drawNoteOverlay(
-                            const InteractionRuntimeState& interactionState,
-                            Shader& uiShader,
-                            unsigned int quadVAO) {
-	
-	if (!interactionState.noteOpen)
-		return;
+                            const GameState& gameState,
+							Shader& uiShader,
+							unsigned int quadVAO
+) {
+	const InteractionRuntimeState &interactionState = gameState.interaction;
 
-	if (interactionState.activeNoteTexture == 0)
+	if (!interactionState.noteOpen || interactionState.activeNoteTexture == 0)
 		return;
 
 	glDisable(GL_DEPTH_TEST);

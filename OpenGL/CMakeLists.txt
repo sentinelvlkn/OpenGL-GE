@@ -24,11 +24,13 @@ add_executable(${PROJECT_NAME}
     src/FadeSystem.cpp
     src/FramebufferSystem.cpp
     src/ScreenRenderer.cpp
+    src/SceneRenderer.cpp
     src/RoomTransitionSystem.cpp
     src/CameraSystem.cpp
     src/GameplaySystem.cpp
     src/GameUIRenderer.cpp
     src/DebugInputSystem.cpp
+    src/FrameTimingSystem.cpp
     
     src/stb_image_impl.cpp
   "src/glad.c" "src/include/Room.h" "src/Room.cpp" "src/include/Prop.h")

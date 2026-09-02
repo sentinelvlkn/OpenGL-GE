@@ -12,16 +12,6 @@ void renderScreen(
 							Shader& screenShader,
 							unsigned int textureColorBuffer, 
 							const AppState& appState,
-							const GameState& gameState,
-							float time
+							const GameState& gameState
 );
 
-
-void renderSceneToFBO(
-							unsigned int framebuffer,
-							Shader& shader,
-							Model& playerModel,
-							const AppState& appState,
-							GameState& gameState,
-							float time
-);

@@ -1,19 +1,22 @@
 #include "include/Input.h"
+
 #include <GLFW/glfw3.h>
+
+#include "include/GameState.h"
 #include "include/FadeSystem.h"
 
-void processInput(GLFWwindow *window, FadeState& fadeState) {
+void processInput(GLFWwindow *window, GameState &gameState) {
 
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
 	
 	// fadeIn sets to true
 	if (glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS) {
-		beginFadeToBlack(fadeState);
+		beginFadeToBlack(gameState.fade);
 	}
 	// fadeOut sets to true
 	if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS) {
-		beginFadeFromBlack(fadeState);
+		beginFadeFromBlack(gameState.fade);
 	}
 }
 

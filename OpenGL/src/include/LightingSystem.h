@@ -1,6 +1,8 @@
 #pragma once
 
 struct GLFWwindow;
+struct AppState;
+struct GameState;
 
 #include "include/Light.h"
 
@@ -13,8 +15,8 @@ struct LightingDebugState {
 	bool spotAsPoint = false;
 };
 
-float calculateFlickerMultiplier(const PointLight& light, float time, int lightIndex, 
-	const LightingDebugState& debugState);
+float calculateFlickerMultiplier(const PointLight& light, float time, int lightIndex, const LightingDebugState& debugState);
 
-void updateLightningDebugInput(GLFWwindow *window, float deltaTime, 
-	LightingDebugState& debugState);
+void updateLightningDebugInput(GLFWwindow *window, float deltaTime, GameState& gameState);
+
+void updateLightningDebugInput(GLFWwindow* window, const AppState& appState, GameState& gameState);

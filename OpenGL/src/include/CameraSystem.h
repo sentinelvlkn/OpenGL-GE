@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Room.h"
-#include "Player.h"
-#include "Camera.h"
+struct GameState;
 
-void updateRoomCamera(Room &room, const Player &player, Camera &camera);
+void updateRoomCamera(GameState& gameState);

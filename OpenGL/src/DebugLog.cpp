@@ -1,8 +1,5 @@
 #include "include/DebugLog.h"
-#include "include/Player.h"
-#include "include/Room.h"
 #include <iostream>
-#include <sstream>
 
 namespace {
 	std::vector<std::string> gLines;

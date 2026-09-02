@@ -2,47 +2,55 @@
 
 #include <GLFW/glfw3.h>
 
+#include "include/AppState.h"
+#include "include/GameState.h"
 #include "include/Input.h"
 #include "include/PlayerMovement.h"
+#include "include/InteractionSystem.h"
+#include "include/RoomTransitionSystem.h"
 
-std::string updateGameplay(	GLFWwindow *window, 
-							Room &room, 
-							Player &player,
-							const Camera &camera,
-							RoomTransitionState &roomTransitionState,
-							FadeState &fadeState,
-							InteractionRuntimeState &interactionState,
-							float deltaTime) {
-
+std::string updateGameplay(
+                            GLFWwindow* window,
+                            GameState& gameState,
+                            float deltaTime
+) {
 	std::string promptText;
 
-	if (roomTransitionState.transitioning)
+	if (gameState.roomTransition.transitioning)
 		return promptText;
 
 	bool pressedE = keyPressedOnce(window, GLFW_KEY_E);
 
-	if (interactionState.messageOpen) {
-		if (pressedE) 
-			closeActiveInteraction(interactionState);
+	if (gameState.interaction.messageOpen) {
+		if (pressedE)
+			closeActiveInteraction(gameState.interaction);
 
 		return promptText;
 	}
 
-	updatePlayerMovement(window, player, camera, room, deltaTime);
+	updatePlayerMovement(window, gameState.player, gameState.camera, gameState.room, deltaTime);
 
-	NearbyAction nearbyAction = getNearbyAction(room, player.position);
+	NearbyAction nearbyAction = getNearbyAction(gameState.room, gameState.player.position);
 
 	promptText = nearbyAction.promptText;
 
-	if (nearbyAction.door && pressedE) 
-		beginRoomTransition(roomTransitionState,
-							nearbyAction.door->targetRoomJson,
-							nearbyAction.door->targetSpawn, 
-							fadeState
+	if (nearbyAction.door && pressedE)
+		beginRoomTransition(
+			gameState,
+			nearbyAction.door->targetRoomJson,
+			nearbyAction.door->targetSpawn
 		);
 
 	else if (nearbyAction.interaction && pressedE)
-		runInteraction(*nearbyAction.interaction, interactionState);
-	
+		runInteraction(*nearbyAction.interaction, gameState.interaction);
+
 	return promptText;
+}
+
+std::string updateGameplay(
+							GLFWwindow* window,
+							const AppState& appState,
+							GameState& gameState
+) {
+    return updateGameplay(window, gameState, appState.timing.deltaTime);
 }

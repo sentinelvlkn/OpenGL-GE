@@ -2,13 +2,8 @@
 #include <GLFW/glfw3.h>
 #include <include/Input.h>
 #include "include/Shader.h"
-#include "include/Camera.h"
 #include "include/Model.h"
-#include "include/Room.h"
-#include "include/Player.h"
-#include "include/InteractionSystem.h"
 #include "include/AssetCache.h"
-#include "include/LightingSystem.h"
 #include "include/FileSystem.h"
 #include "include/TextRenderer.h"
 #include "include/UiRenderer.h"
@@ -17,16 +12,16 @@
 #include "include/FadeSystem.h"
 #include "include/FramebufferSystem.h"
 #include "include/ScreenRenderer.h"
-#include "include/RoomTransitionSystem.h"
+#include "include/SceneRenderer.h"
 #include "include/CameraSystem.h"
 #include "include/GameplaySystem.h"
 #include "include/GameUIRenderer.h"
 #include "include/DebugInputSystem.h"
 #include "include/AppState.h"
 #include "include/GameState.h"
-#include "glm/glm.hpp"
-#include <vector>
-#include <sstream>
+#include "include/AppContext.h"
+#include "include/FrameTimingSystem.h"
+#include <glm/glm.hpp>
 
 #include <iostream>
 #include "include/test_vertices.h"
@@ -38,14 +33,6 @@ void glfwErrorCallback(int error, const char* description);
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-
-Camera camera(glm::vec3(0.0f, 0.0f, 5.0f));
-float lastX = INITIAL_WIDTH * 0.5;
-float lastY = INITIAL_HEIGHT * 0.5;
-bool firstMouse = true;
-
-float deltaTime = 0.0f;
-float lastFrame = 0.0f;
 
 int main()
 {
@@ -65,9 +52,13 @@ int main()
 
 	AppState appState;
 	GameState gameState;
-	
+
+	AppContext appContext;
+	appContext.appState = &appState;
+	appContext.gameState = &gameState;
+
 	glfwMakeContextCurrent(window);
-	glfwSetWindowUserPointer(window, &appState);
+	glfwSetWindowUserPointer(window, &appContext);
 
 	glfwSetErrorCallback(glfwErrorCallback);
 
@@ -75,6 +66,10 @@ int main()
 	glfwGetFramebufferSize(window, &appState.framebufferWidth, &appState.framebufferHeight);
 	//glfwSetCursorPosCallback(window, mouse_callback);
 	//glfwSetScrollCallback(window, scroll_callback);
+
+	appState.lastMouseX = appState.framebufferWidth * 0.5f;
+	appState.lastMouseY = appState.framebufferHeight * 0.5f;
+	appState.firstMouse = true;
 
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	
@@ -131,8 +126,7 @@ int main()
 
 	gameState.player.position = gameState.room.playerSpawn;
 
-	roomCameraSwitch(gameState.room, gameState.player.position);
-	applyRoomCamera(gameState.room, gameState.camera);
+	updateRoomCamera(gameState);
 
 	TextRenderer textRenderer;
 	std::string fontPath = FileSystem::pathFromRoot("src/ui/fonts/LektonNerdFontMono-Regular.ttf");
@@ -189,7 +183,7 @@ int main()
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	
-	lastFrame = static_cast<float>(glfwGetTime());
+	initializeFrameTiming(appState);
 
 	float promptScale = 0.75f;
 
@@ -202,111 +196,46 @@ int main()
 	//main game loop
 	while (!glfwWindowShouldClose(window)) {
 
-		float currentFrame = static_cast<float>(glfwGetTime());
-		deltaTime = currentFrame - lastFrame;
-		lastFrame = currentFrame;
-
-		float time = static_cast<float>(glfwGetTime());
-
-		deltaTime = glm::min(deltaTime, 1.0f / 30.0f);
+		updateFrameTiming(appState);
 
 		std::string promptText;
 
 		if (appState.framebufferResized)
-			resizeFramebufferAttachments(
-				framebuffer,
-				textureColorBuffer,
-				RBO,
-				appState
-			);
-		
+			resizeFramebufferAttachments(framebuffer, textureColorBuffer, RBO, appState);
 
-		processInput(window, gameState.fade);
+		processInput(window, gameState);
 
-		updateLightningDebugInput(window, deltaTime, gameState.lightingDebug);
+		updateLightningDebugInput(window, appState, gameState);
 
-		updateDebugInput(
-			window,
-			appState,
-			gameState
-		);
+		updateDebugInput(window, appState, gameState);
 
-		updateFade(
-			gameState.fade,
-			deltaTime
-		);
+		updateFade(gameState, appState);
 
-		updateRoomTransition(
-			gameState.roomTransition,
-			gameState.fade,
-			gameState.room,
-			gameState.roomModel,
-			gameState.player,
-			gameState.camera
-		);
+		updateRoomTransition(gameState);
 
-		promptText = updateGameplay(
-			window,
-			gameState.room,
-			gameState.player,
-			gameState.camera,
-			gameState.roomTransition,
-			gameState.fade,
-			gameState.interaction,
-			deltaTime
-		);
+		promptText = updateGameplay(window, appState, gameState);
 
-		if (!gameState.roomTransition.transitioning) {
-			updateRoomCamera(
-				gameState.room,
-				gameState.player,
-				gameState.camera
-			);
-		}
+		if (!gameState.roomTransition.transitioning)
+			updateRoomCamera(gameState);
 
-		renderSceneToFBO(
-			framebuffer,
-			shader,
-			playerModel,
-			appState,
-			gameState,
-			time
-		);
+		renderSceneToFBO(framebuffer, shader, playerModel, appState, gameState);
 
-		renderScreen(
-			quadVAO,
-			screenShader,
-			textureColorBuffer,
-			appState,
-			gameState,
-			time
-		);
+		renderScreen(quadVAO, screenShader, textureColorBuffer, appState, gameState);
 
 		drawInteractionPrompt(
 			promptText,
-			!gameState.interaction.messageOpen && !gameState.roomTransition.transitioning,
 			uiRenderer,
 			uiRectangleShader,
 			textRenderer,
 			textShader,
-			appState.framebufferWidth,
-			appState.framebufferHeight,
+			appState,
+			gameState,
 			promptScale
 		);
 
-		drawNoteOverlay(
-			gameState.interaction,
-			uiShader,
-			quadVAO
-		);
+		drawNoteOverlay(gameState, uiShader, quadVAO);
 
-		drawDebugTerminal(
-			uiRenderer,
-			uiRectangleShader,
-			textRenderer,
-			textShader,
-			appState
-		);
+		drawDebugTerminal(uiRenderer, uiRectangleShader, textRenderer, textShader, appState);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -330,37 +259,51 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height){
 	if (width <= 0 || height <= 0)
 		return;
 
-	AppState *appState = static_cast<AppState *>(glfwGetWindowUserPointer(window));
+	AppContext* context = static_cast<AppContext*>(glfwGetWindowUserPointer(window));
 
-	if (!appState)
+	if (!context || !context->appState)
 		return;
 
-	appState->framebufferWidth = width;
-	appState->framebufferHeight = height;
-	appState->framebufferResized = true;
+	context->appState->framebufferWidth = width;
+	context->appState->framebufferHeight = height;
+	context->appState->framebufferResized = true;
 }
 
 void mouse_callback(GLFWwindow* window, double xposIn, double yposIn){
+	AppContext* context = static_cast<AppContext*>(glfwGetWindowUserPointer(window));
+
+	if (!context || !context->appState || !context->gameState)
+		return;
+
+	AppState& appState = *context->appState;
+	GameState& gameState = *context->gameState;
+
 	float xpos = static_cast<float>(xposIn);
-	    float ypos = static_cast<float>(yposIn);
-	    if (firstMouse){
-	        lastX = xpos;
-	        lastY = ypos;
-	        firstMouse = false;
-	    }
+	float ypos = static_cast<float>(yposIn);
 
-	    float xoffset = xpos - lastX;
-	    float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+	if (appState.firstMouse) {
+		appState.lastMouseX = xpos;
+		appState.lastMouseY = ypos;
+		appState.firstMouse = false;
+	}
 
-	    lastX = xpos;
-	    lastY = ypos;
+	float xoffset = xpos - appState.lastMouseX;
+	float yoffset = appState.lastMouseY - ypos;
 
-	    camera.processMouseMovement(xoffset, yoffset);
+	appState.lastMouseX = xpos;
+	appState.lastMouseY = ypos;
+
+	gameState.camera.processMouseMovement(xoffset, yoffset);
 	
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
-    camera.processMouseScroll(static_cast<float>(yoffset));
+	AppContext* context = static_cast<AppContext*>(glfwGetWindowUserPointer(window));
+
+	if (!context || !context->gameState)
+		return;
+
+	context->gameState->camera.processMouseScroll(static_cast<float>(yoffset));
 }
 
 

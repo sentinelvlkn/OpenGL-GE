@@ -1,7 +1,7 @@
 #pragma once
 
 struct GLFWwindow;
-struct FadeState; 
+struct GameState;
 
-void processInput(GLFWwindow *window, FadeState &fadeState);
+void processInput(GLFWwindow *window, GameState &gameState);
 bool keyPressedOnce(GLFWwindow *window, int key);

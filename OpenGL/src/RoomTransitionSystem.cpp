@@ -6,6 +6,7 @@
 #include "include/AssetCache.h"
 #include "include/DebugLog.h"
 #include "include/FileSystem.h"
+#include "include/GameState.h"
 
 void beginRoomTransition(	RoomTransitionState &transitionState,
 							const std::string &targetRoomJson,
@@ -63,3 +64,32 @@ void updateRoomTransition(RoomTransitionState &transitionState,
 		transitionState.pendingRoomJson.clear();
 	}
 }
+
+
+void beginRoomTransition(
+							GameState& gameState,
+							const std::string& targetRoomJson,
+							const glm::vec3& targetSpawn
+) {
+    beginRoomTransition(
+        gameState.roomTransition,
+        targetRoomJson,
+        targetSpawn,
+        gameState.fade
+    );
+}
+
+
+void updateRoomTransition(GameState& gameState)
+{
+    updateRoomTransition(
+        gameState.roomTransition,
+        gameState.fade,
+        gameState.room,
+        gameState.roomModel,
+        gameState.player,
+        gameState.camera
+    );
+}
+
+

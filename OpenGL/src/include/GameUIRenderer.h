@@ -2,25 +2,27 @@
 
 #include <string>
 
-#include "Shader.h"
-#include "TextRenderer.h"
-#include "UiRenderer.h"
-#include "InteractionSystem.h"
+class Shader;
+class TextRenderer;
+class UiRenderer;
+
+struct AppState;
+struct GameState;
 
 void drawInteractionPrompt(
                             const std::string& promptText,
-                            bool shouldDraw,
                             UiRenderer& uiRenderer,
                             Shader& uiRectangleShader,
                             TextRenderer& textRenderer,
                             Shader& textShader,
-                            int screenWidth,
-                            int screenHeight,
+                            const AppState& appState,
+                            const GameState& gameState,
                             float promptScale
 );
 
 void drawNoteOverlay(
-                            const InteractionRuntimeState& interactionState,
+                            const GameState& gameState,
                             Shader& uiShader,
                             unsigned int quadVAO
 );
+

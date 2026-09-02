@@ -8,6 +8,8 @@
 #include <glm/common.hpp>
 #include <glm/trigonometric.hpp>
 
+#include "include/AppState.h"
+#include "include/GameState.h"
 #include "include/DebugLog.h"
 #include "include/Input.h"
 
@@ -98,7 +100,9 @@ float calculateFlickerMultiplier(	const PointLight &light,
 
 void updateLightningDebugInput(	GLFWwindow *window, 
 								float deltatime,
-								LightingDebugState &debugState) {
+								GameState& gameState) {
+
+	LightingDebugState& debugState = gameState.lightingDebug;
 
 	if (keyPressedOnce(window, GLFW_KEY_F5)) {
 		debugState.forcedLightningTimer = 0.25f;
@@ -136,4 +140,8 @@ void updateLightningDebugInput(	GLFWwindow *window,
 			DebugLog::log("[LIGHT DEBUG] Forced lightning flash ended");
 		}
 	}
+}
+
+void updateLightningDebugInput(GLFWwindow *window, const AppState &appState, GameState &gameState) {
+	updateLightningDebugInput(window, appState.timing.deltaTime, gameState);
 }

@@ -1,14 +1,15 @@
 #pragma once
 
 #include <string>
-
 #include <glm/glm.hpp>
 
-#include "Room.h"
-#include "Player.h"
-#include "Camera.h"
-#include "Model.h"
-#include "FadeSystem.h"
+struct FadeState;
+struct RoomTransitionState;
+struct Room;
+struct Player;
+class Camera;
+class Model;
+struct GameState;
 
 struct RoomTransitionState {
 	bool transitioning = false;
@@ -24,6 +25,12 @@ void beginRoomTransition(
 							FadeState& fadestate
 );
 
+void beginRoomTransition(
+							GameState& gameState,
+							const std::string& targetRoomJson,
+							const glm::vec3& targetSpawn
+);
+
 void updateRoomTransition(
 							RoomTransitionState& transitionState,
 							FadeState& fadeState,
@@ -32,3 +39,5 @@ void updateRoomTransition(
 							Player& player,
 							Camera& camera
 );
+
+void updateRoomTransition(GameState &gameState);

@@ -1,6 +1,11 @@
 #include "include/CameraSystem.h"
 
-void updateRoomCamera(Room &room, const Player &player, Camera &camera) {
-	roomCameraSwitch(room, player.position);
-	applyRoomCamera(room, camera);
+#include "include/GameState.h"
+#include "include/Room.h"
+#include "include/Player.h"
+#include "include/Camera.h"
+
+void updateRoomCamera(GameState &gameState) {
+	roomCameraSwitch(gameState.room, gameState.player.position);
+	applyRoomCamera(gameState.room, gameState.camera);
 }
