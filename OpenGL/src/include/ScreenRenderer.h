@@ -7,10 +7,11 @@ class Model;
 struct AppState;
 struct GameState;
 struct FramebufferState;
+struct ShaderState;
 
 void renderScreen(
 							unsigned int quadVAO, 
-							Shader& screenShader,
+							ShaderState& shaders,
 							const FramebufferState& fboState, 
 							const AppState& appState,
 							const GameState& gameState

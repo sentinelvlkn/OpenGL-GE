@@ -2,19 +2,18 @@
 
 #include <string>
 
-class Shader;
 class TextRenderer;
 class UiRenderer;
 
 struct AppState;
 struct GameState;
+struct ShaderState;
 
 void drawInteractionPrompt(
                             const std::string& promptText,
                             UiRenderer& uiRenderer,
-                            Shader& uiRectangleShader,
                             TextRenderer& textRenderer,
-                            Shader& textShader,
+                            ShaderState& shaders,
                             const AppState& appState,
                             const GameState& gameState,
                             float promptScale
@@ -22,7 +21,7 @@ void drawInteractionPrompt(
 
 void drawNoteOverlay(
                             const GameState& gameState,
-                            Shader& uiShader,
+                            ShaderState& shaders,
                             unsigned int quadVAO
 );
 

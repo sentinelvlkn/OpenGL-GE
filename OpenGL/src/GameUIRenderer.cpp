@@ -7,16 +7,15 @@
 #include "include/AppState.h"
 #include "include/GameState.h"
 #include "include/InteractionSystem.h"
-#include "include/Shader.h"
 #include "include/TextRenderer.h"
 #include "include/UiRenderer.h"
+#include "include/ShaderSystem.h"
 
 void drawInteractionPrompt(
 							const std::string& promptText,
 							UiRenderer& uiRenderer,
-							Shader& uiRectangleShader,
 							TextRenderer& textRenderer,
-							Shader& textShader,
+							ShaderState& shaders,
 							const AppState& appState,
 							const GameState& gameState,
 							float promptScale
@@ -33,6 +32,9 @@ void drawInteractionPrompt(
 
 	if (gameState.roomTransition.transitioning)
 		return;
+
+	Shader& uiRectangleShader = shaders.uiRectangleShader;
+	Shader &textShader = shaders.textShader;
 
 	float screenWidth = static_cast<float>(appState.framebufferWidth);
 	float screenHeight = static_cast<float>(appState.framebufferHeight);
@@ -74,10 +76,12 @@ void drawInteractionPrompt(
 
 void drawNoteOverlay(
                             const GameState& gameState,
-							Shader& uiShader,
+							ShaderState& shaders,
 							unsigned int quadVAO
 ) {
 	const InteractionRuntimeState &interactionState = gameState.interaction;
+
+	Shader &uiShader = shaders.uiShader;
 
 	if (!interactionState.noteOpen || interactionState.activeNoteTexture == 0)
 		return;

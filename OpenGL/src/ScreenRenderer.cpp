@@ -1,5 +1,6 @@
 #include "include/ScreenRenderer.h"
 #include "include/FramebufferSystem.h"
+#include "include/ShaderSystem.h"
 
 #include <glad/glad.h>
 
@@ -11,12 +12,14 @@
 
 void renderScreen(
 							unsigned int quadVAO, 
-							Shader& screenShader,
+							ShaderState& shaders,
 							const FramebufferState& fboState, 
 							const AppState& appState,
 							const GameState& gameState
 ) {
 	
+	Shader &screenShader = shaders.screenShader;
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, appState.framebufferWidth, appState.framebufferHeight);
 	glDisable(GL_DEPTH_TEST);

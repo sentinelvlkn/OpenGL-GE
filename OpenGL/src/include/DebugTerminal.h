@@ -1,10 +1,12 @@
 #pragma once
 
 struct UiRenderer;
-struct Shader;
 struct TextRenderer;
 struct AppState;
+struct ShaderState;
 
-void drawDebugTerminal(	UiRenderer &uiRenderer, Shader &uiRectangleShader,
-						TextRenderer &textRenderer, Shader &textShader,
-						const AppState &appState);
+void drawDebugTerminal(	UiRenderer &uiRenderer, 
+						TextRenderer &textRenderer, 
+						ShaderState& shaders,
+						const AppState &appState
+);

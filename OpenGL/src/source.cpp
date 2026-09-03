@@ -22,6 +22,7 @@
 #include "include/AppContext.h"
 #include "include/FrameTimingSystem.h"
 #include "include/GameBootstrap.h"
+#include "include/ShaderSystem.h"
 #include <glm/glm.hpp>
 
 #include <iostream>
@@ -87,31 +88,9 @@ int main()
 
 
 	glEnable(GL_DEPTH_TEST);
-		
-	Shader shader( 
-		FileSystem::pathFromRoot("src/shaders/vertex_shader.vert").c_str(),
-		FileSystem::pathFromRoot("src/shaders/fragment_shader.frag").c_str()
-	);
 
-	Shader screenShader(
-		FileSystem::pathFromRoot("src/shaders/fbuffer_vertex_shader.vert").c_str(),
-		FileSystem::pathFromRoot("src/shaders/fbuffer_fragment_shader.frag").c_str()
-	);
-
-	Shader uiShader(
-		FileSystem::pathFromRoot("src/shaders/note_quad.vert").c_str(),
-		FileSystem::pathFromRoot("src/shaders/note_quad.frag").c_str()
-	);
-
-	Shader textShader(
-		FileSystem::pathFromRoot("src/shaders/text.vert").c_str(),
-		FileSystem::pathFromRoot("src/shaders/text.frag").c_str()
-	);
-
-	Shader uiRectangleShader(
-		FileSystem::pathFromRoot("src/shaders/ui_rectangle.vert").c_str(),
-		FileSystem::pathFromRoot("src/shaders/ui_rectangle.frag").c_str()
-	);
+	ShaderState shaders;
+	initializeShaders(shaders);
 
 	DebugLog::log("Debug terminal ready. Press F1 to toggle. Press F2 to print player state.");
 
@@ -141,15 +120,6 @@ int main()
 	glEnableVertexAttribArray(1);
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)(2*sizeof(float)));
 
-	screenShader.use();
-	//screenShader.setInt("screenTexture", 0);
-	screenShader.setFloat("vignetteStrength", 0.5f);
-	screenShader.setFloat("grainStrength", 0.02f);
-	screenShader.setFloat("saturation", 0.7f);
-	screenShader.setFloat("contrast", 1.2f);
-
-	uiShader.use();
-	uiShader.setInt("uiTexture", 0);
 	
 	FramebufferState fboState;
 
@@ -190,24 +160,23 @@ int main()
 		if (!gameState.roomTransition.transitioning)
 			updateRoomCamera(gameState);
 
-		renderSceneToFBO(fboState, shader, playerModel, appState, gameState);
+		renderSceneToFBO(fboState, shaders, playerModel, appState, gameState);
 
-		renderScreen(quadVAO, screenShader, fboState, appState, gameState);
+		renderScreen(quadVAO, shaders, fboState, appState, gameState);
 
 		drawInteractionPrompt(
 			promptText,
 			uiRenderer,
-			uiRectangleShader,
 			textRenderer,
-			textShader,
+			shaders,
 			appState,
 			gameState,
 			promptScale
 		);
 
-		drawNoteOverlay(gameState, uiShader, quadVAO);
+		drawNoteOverlay(gameState, shaders, quadVAO);
 
-		drawDebugTerminal(uiRenderer, uiRectangleShader, textRenderer, textShader, appState);
+		drawDebugTerminal(uiRenderer, textRenderer, shaders, appState);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();

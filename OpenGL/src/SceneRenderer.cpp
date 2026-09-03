@@ -11,6 +11,7 @@
 
 #include "include/AppState.h"
 #include "include/GameState.h"
+#include "include/ShaderSystem.h"
 #include "include/Shader.h"
 #include "include/Model.h"
 #include "include/Room.h"
@@ -231,11 +232,12 @@ static void drawPlayer(Shader &shader, Model &playerModel,
 }
 
 void renderSceneToFBO(	const FramebufferState& fboState, 
-						Shader &shader,
-						Model &playerModel, 
+						ShaderState& shaders,
+						Model& playerModel, 
 						const AppState &appState,
 						GameState &gameState
 ) {
+
 
 	if (appState.framebufferWidth <= 0 || appState.framebufferHeight <= 0)
 		return;
@@ -244,6 +246,8 @@ void renderSceneToFBO(	const FramebufferState& fboState,
 		DebugLog::log("[RENDER ERROR] No active room model");
 		return;
 	}
+
+	Shader &shader = shaders.sceneShader;
 
 	float time = appState.timing.currentTime;
 

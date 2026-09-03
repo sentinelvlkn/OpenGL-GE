@@ -2,6 +2,8 @@
 #include "include/Appstate.h"
 #include "include/TextRenderer.h"
 #include "include/UiRenderer.h"
+#include "include/ShaderSystem.h"
+#include "include/Shader.h"
 
 #include <sstream>
 #include <string>
@@ -73,12 +75,17 @@ static std::vector<std::string> wrapTextWidth(const std::string &text,
 	return result;
 }
 
-void drawDebugTerminal(UiRenderer &uiRenderer, Shader &uiRectangleShader,
-							  TextRenderer &textRenderer, Shader &textShader,
-							  const AppState& appState) {
+void drawDebugTerminal(	UiRenderer &uiRenderer, 
+						TextRenderer &textRenderer, 
+						ShaderState& shaders,
+						const AppState &appState
+) {
 
 	if (!appState.debugTerminalOpen)
 		return;
+
+	Shader& uiRectangleShader = shaders.uiRectangleShader;
+	Shader& textShader = shaders.textShader;
 
 	float sw = static_cast<float>(appState.framebufferWidth);
 	float sh = static_cast<float>(appState.framebufferHeight);
