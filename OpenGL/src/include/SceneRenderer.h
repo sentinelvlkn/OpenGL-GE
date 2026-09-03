@@ -1,17 +1,15 @@
 #pragma once
 
-class Shader;
-class Model;
-
 struct AppState;
 struct GameState;
 struct FramebufferState;
 struct ShaderState;
+struct ModelState;
 
 void renderSceneToFBO(
 							const FramebufferState& fboState,
 							ShaderState& shaders,
-							Model& playerModel,
+							ModelState& models,
 							const AppState& appState,
 							GameState& gameState
 );

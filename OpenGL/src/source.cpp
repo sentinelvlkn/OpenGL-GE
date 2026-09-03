@@ -2,9 +2,7 @@
 #include <GLFW/glfw3.h>
 #include <include/Input.h>
 #include "include/Shader.h"
-#include "include/Model.h"
 #include "include/AssetCache.h"
-#include "include/FileSystem.h"
 #include "include/DebugLog.h"
 #include "include/DebugTerminal.h"
 #include "include/FadeSystem.h"
@@ -23,6 +21,7 @@
 #include "include/ShaderSystem.h"
 #include "include/UiSystem.h"
 #include "include/QuadMeshSystem.h"
+#include "include/ModelSystem.h"
 #include <glm/glm.hpp>
 
 #include <iostream>
@@ -95,9 +94,8 @@ int main()
 
 	initializeGameState(gameState, "src/models/test_room/test_room.json");
 
-	Model playerModel(
-		FileSystem::pathFromRoot("src/models/test_character/test_character.obj").c_str()
-	);
+	ModelState modelState;
+	initializeModels(modelState);
 
 	updateRoomCamera(gameState);
 
@@ -142,7 +140,7 @@ int main()
 		if (!gameState.roomTransition.transitioning)
 			updateRoomCamera(gameState);
 
-		renderSceneToFBO(fboState, shaders, playerModel, appState, gameState);
+		renderSceneToFBO(fboState, shaders, modelState, appState, gameState);
 
 		renderScreen(quadMeshState, shaders, fboState, appState, gameState);
 

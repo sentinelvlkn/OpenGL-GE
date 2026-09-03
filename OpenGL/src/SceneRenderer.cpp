@@ -22,6 +22,7 @@
 #include "include/LightingSystem.h"
 #include "include/Light.h"
 #include "include/Prop.h"
+#include "include/ModelSystem.h"
 
 namespace {
 	constexpr int MAX_POINT_LIGHTS = 8;
@@ -231,11 +232,12 @@ static void drawPlayer(Shader &shader, Model &playerModel,
 	playerModel.Draw(shader);
 }
 
-void renderSceneToFBO(	const FramebufferState& fboState, 
-						ShaderState& shaders,
-						Model& playerModel, 
-						const AppState &appState,
-						GameState &gameState
+void renderSceneToFBO(
+							const FramebufferState& fboState,
+							ShaderState& shaders,
+							ModelState& models,
+							const AppState& appState,
+							GameState& gameState
 ) {
 
 
@@ -288,7 +290,7 @@ void renderSceneToFBO(	const FramebufferState& fboState,
 
 	drawRoom(shader, *gameState.roomModel);
 	drawProps(shader, gameState.room, time);
-	drawPlayer(shader, playerModel, gameState.player);
+	drawPlayer(shader, models.playerModel, gameState.player);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
