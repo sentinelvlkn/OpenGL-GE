@@ -1,6 +1,7 @@
 #include "include/ScreenRenderer.h"
 #include "include/FramebufferSystem.h"
 #include "include/ShaderSystem.h"
+#include "include/QuadMeshSystem.h"
 
 #include <glad/glad.h>
 
@@ -11,7 +12,7 @@
 
 
 void renderScreen(
-							unsigned int quadVAO, 
+							const QuadMeshState& quadMeshState, 
 							ShaderState& shaders,
 							const FramebufferState& fboState, 
 							const AppState& appState,
@@ -44,7 +45,7 @@ void renderScreen(
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, fboState.textureColorbuffer);
 
-	glBindVertexArray(quadVAO);
+	glBindVertexArray(quadMeshState.vao);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 
 	glBindVertexArray(0);

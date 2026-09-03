@@ -1,16 +1,13 @@
 #pragma once
 
-
-class Shader;
-class Model;
-
 struct AppState;
 struct GameState;
 struct FramebufferState;
 struct ShaderState;
+struct QuadMeshState;
 
 void renderScreen(
-							unsigned int quadVAO, 
+							const QuadMeshState& quadMeshState, 
 							ShaderState& shaders,
 							const FramebufferState& fboState, 
 							const AppState& appState,

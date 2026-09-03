@@ -10,6 +10,7 @@
 #include "include/TextRenderer.h"
 #include "include/ShaderSystem.h"
 #include "include/UiSystem.h"
+#include "include/QuadMeshSystem.h"
 
 void drawInteractionPrompt(
                             const std::string& promptText,
@@ -78,8 +79,8 @@ void drawInteractionPrompt(
 
 void drawNoteOverlay(
                             const GameState& gameState,
-							ShaderState& shaders,
-							unsigned int quadVAO
+                            ShaderState& shaders,
+                            const QuadMeshState& quadMeshState
 ) {
 	const InteractionRuntimeState &interactionState = gameState.interaction;
 
@@ -96,7 +97,7 @@ void drawNoteOverlay(
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, interactionState.activeNoteTexture);
 
-	glBindVertexArray(quadVAO);
+	glBindVertexArray(quadMeshState.vao);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 
 	glBindVertexArray(0);

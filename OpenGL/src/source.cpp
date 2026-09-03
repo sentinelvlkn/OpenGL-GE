@@ -5,8 +5,6 @@
 #include "include/Model.h"
 #include "include/AssetCache.h"
 #include "include/FileSystem.h"
-#include "include/TextRenderer.h"
-#include "include/UiRenderer.h"
 #include "include/DebugLog.h"
 #include "include/DebugTerminal.h"
 #include "include/FadeSystem.h"
@@ -24,10 +22,10 @@
 #include "include/GameBootstrap.h"
 #include "include/ShaderSystem.h"
 #include "include/UiSystem.h"
+#include "include/QuadMeshSystem.h"
 #include <glm/glm.hpp>
 
 #include <iostream>
-#include "include/test_vertices.h"
 
 constexpr int INITIAL_WIDTH = 800;
 constexpr int INITIAL_HEIGHT = 600;
@@ -103,16 +101,8 @@ int main()
 
 	updateRoomCamera(gameState);
 
-	unsigned int quadVAO, quadVBO;
-	glGenVertexArrays(1, &quadVAO);
-	glGenBuffers(1, &quadVBO);
-	glBindVertexArray(quadVAO);
-	glBindBuffer(GL_ARRAY_BUFFER,quadVBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)0);
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)(2*sizeof(float)));
+	QuadMeshState quadMeshState;
+	initializeScreenQuad(quadMeshState);
 
 	UiState uiState;
 	initializeUi(uiState);
@@ -154,7 +144,7 @@ int main()
 
 		renderSceneToFBO(fboState, shaders, playerModel, appState, gameState);
 
-		renderScreen(quadVAO, shaders, fboState, appState, gameState);
+		renderScreen(quadMeshState, shaders, fboState, appState, gameState);
 
 		drawInteractionPrompt(
 			promptText,
@@ -164,7 +154,7 @@ int main()
 			gameState
 		);
 
-		drawNoteOverlay(gameState, shaders, quadVAO);
+		drawNoteOverlay(gameState, shaders, quadMeshState);
 
 		drawDebugTerminal(uiState, shaders, appState);
 
@@ -173,8 +163,7 @@ int main()
 	}
 	
 	destroyFramebuffer(fboState);
-	glDeleteVertexArrays(1, &quadVAO);
-	glDeleteBuffers(1, &quadVBO);
+	destroyScreenQuad(quadMeshState);
 		
 	glfwTerminate();
     return 0;

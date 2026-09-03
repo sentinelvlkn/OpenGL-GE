@@ -2,13 +2,11 @@
 
 #include <string>
 
-class TextRenderer;
-class UiRenderer;
-
 struct AppState;
 struct GameState;
 struct ShaderState;
 struct UiState;
+struct QuadMeshState;
 
 void drawInteractionPrompt(
                             const std::string& promptText,
@@ -21,6 +19,6 @@ void drawInteractionPrompt(
 void drawNoteOverlay(
                             const GameState& gameState,
                             ShaderState& shaders,
-                            unsigned int quadVAO
+                            const QuadMeshState& quadMeshState
 );
 
