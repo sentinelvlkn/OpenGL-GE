@@ -33,6 +33,7 @@ add_executable(${PROJECT_NAME}
     src/FrameTimingSystem.cpp
     src/GameBootstrap.cpp
     src/ShaderSystem.cpp
+    src/UiSystem.cpp
 
     src/stb_image_impl.cpp
   "src/glad.c" "src/include/Room.h" "src/Room.cpp" "src/include/Prop.h")

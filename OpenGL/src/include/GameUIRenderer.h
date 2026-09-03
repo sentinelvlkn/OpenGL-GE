@@ -8,15 +8,14 @@ class UiRenderer;
 struct AppState;
 struct GameState;
 struct ShaderState;
+struct UiState;
 
 void drawInteractionPrompt(
                             const std::string& promptText,
-                            UiRenderer& uiRenderer,
-                            TextRenderer& textRenderer,
+                            UiState& uiState,
                             ShaderState& shaders,
                             const AppState& appState,
-                            const GameState& gameState,
-                            float promptScale
+                            const GameState& gameState
 );
 
 void drawNoteOverlay(

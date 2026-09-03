@@ -23,6 +23,7 @@
 #include "include/FrameTimingSystem.h"
 #include "include/GameBootstrap.h"
 #include "include/ShaderSystem.h"
+#include "include/UiSystem.h"
 #include <glm/glm.hpp>
 
 #include <iostream>
@@ -102,13 +103,6 @@ int main()
 
 	updateRoomCamera(gameState);
 
-	TextRenderer textRenderer;
-	std::string fontPath = FileSystem::pathFromRoot("src/ui/fonts/LektonNerdFontMono-Regular.ttf");
-
-	if (!textRenderer.loadFont(fontPath, 24))
-		DebugLog::log("[TEXT ERROR] Failed to load the font: " + fontPath);
-
-	
 	unsigned int quadVAO, quadVBO;
 	glGenVertexArrays(1, &quadVAO);
 	glGenBuffers(1, &quadVBO);
@@ -120,16 +114,14 @@ int main()
 	glEnableVertexAttribArray(1);
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)(2*sizeof(float)));
 
-	
+	UiState uiState;
+	initializeUi(uiState);
+
 	FramebufferState fboState;
 
 	initializeFramebuffer(fboState, appState);
 	
 	initializeFrameTiming(appState);
-
-	float promptScale = 0.75f;
-
-	UiRenderer uiRenderer;
 
 	DebugLog::log("[BOOT] Debug terminal initialized.");
 	DebugLog::log("[BOOT] Press F1 to toggle terminal.");
@@ -166,17 +158,15 @@ int main()
 
 		drawInteractionPrompt(
 			promptText,
-			uiRenderer,
-			textRenderer,
+			uiState,
 			shaders,
 			appState,
-			gameState,
-			promptScale
+			gameState
 		);
 
 		drawNoteOverlay(gameState, shaders, quadVAO);
 
-		drawDebugTerminal(uiRenderer, textRenderer, shaders, appState);
+		drawDebugTerminal(uiState, shaders, appState);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();

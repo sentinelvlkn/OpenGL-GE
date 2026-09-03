@@ -8,17 +8,15 @@
 #include "include/GameState.h"
 #include "include/InteractionSystem.h"
 #include "include/TextRenderer.h"
-#include "include/UiRenderer.h"
 #include "include/ShaderSystem.h"
+#include "include/UiSystem.h"
 
 void drawInteractionPrompt(
-							const std::string& promptText,
-							UiRenderer& uiRenderer,
-							TextRenderer& textRenderer,
-							ShaderState& shaders,
-							const AppState& appState,
-							const GameState& gameState,
-							float promptScale
+                            const std::string& promptText,
+                            UiState& uiState,
+                            ShaderState& shaders,
+                            const AppState& appState,
+                            const GameState& gameState
 ) {
     
 	if (promptText.empty())
@@ -32,6 +30,10 @@ void drawInteractionPrompt(
 
 	if (gameState.roomTransition.transitioning)
 		return;
+
+	UiRenderer &uiRenderer = uiState.uiRenderer;
+	TextRenderer &textRenderer = uiState.textRenderer;
+	float promptScale = uiState.promptScale;
 
 	Shader& uiRectangleShader = shaders.uiRectangleShader;
 	Shader &textShader = shaders.textShader;
