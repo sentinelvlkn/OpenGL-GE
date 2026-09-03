@@ -1,4 +1,5 @@
 #include "include/SceneRenderer.h"
+#include "include/FramebufferSystem.h"
 
 #include <glad/glad.h>
 
@@ -229,9 +230,12 @@ static void drawPlayer(Shader &shader, Model &playerModel,
 	playerModel.Draw(shader);
 }
 
-void renderSceneToFBO(unsigned int framebuffer, Shader &shader,
-					  Model &playerModel, const AppState &appState,
-					  GameState &gameState) {
+void renderSceneToFBO(	const FramebufferState& fboState, 
+						Shader &shader,
+						Model &playerModel, 
+						const AppState &appState,
+						GameState &gameState
+) {
 
 	if (appState.framebufferWidth <= 0 || appState.framebufferHeight <= 0)
 		return;
@@ -243,7 +247,7 @@ void renderSceneToFBO(unsigned int framebuffer, Shader &shader,
 
 	float time = appState.timing.currentTime;
 
-	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, fboState.framebuffer);
 
 	glViewport(0, 0, appState.framebufferWidth, appState.framebufferHeight);
 

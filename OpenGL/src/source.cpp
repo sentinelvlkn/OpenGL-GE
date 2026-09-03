@@ -21,6 +21,7 @@
 #include "include/GameState.h"
 #include "include/AppContext.h"
 #include "include/FrameTimingSystem.h"
+#include "include/GameBootstrap.h"
 #include <glm/glm.hpp>
 
 #include <iostream>
@@ -114,17 +115,11 @@ int main()
 
 	DebugLog::log("Debug terminal ready. Press F1 to toggle. Press F2 to print player state.");
 
-	gameState.room = loadRoomFromJson(
-		FileSystem::pathFromRoot("src/models/test_room/test_room.json").c_str()
-	);
-
-	gameState.roomModel = &getRoomModel(gameState.room);
+	initializeGameState(gameState, "src/models/test_room/test_room.json");
 
 	Model playerModel(
 		FileSystem::pathFromRoot("src/models/test_character/test_character.obj").c_str()
 	);
-
-	gameState.player.position = gameState.room.playerSpawn;
 
 	updateRoomCamera(gameState);
 
@@ -156,32 +151,9 @@ int main()
 	uiShader.use();
 	uiShader.setInt("uiTexture", 0);
 	
-	//framebuffer
-	unsigned int framebuffer;
-	glGenFramebuffers(1, &framebuffer);
-	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-	
-	//color attachment texture
-	unsigned int textureColorBuffer;
-	glGenTextures(1, &textureColorBuffer);
-	glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, appState.framebufferWidth, appState.framebufferHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorBuffer, 0);
-	
-	//renderbuffer obj
-	unsigned int RBO;
-	glGenRenderbuffers(1, &RBO);
-	glBindRenderbuffer(GL_RENDERBUFFER, RBO);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, appState.framebufferWidth, appState.framebufferHeight);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, RBO);
-	
-	//check if framebuffer was crated
-	if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE){
-		DebugLog::log("[FRAMEBUFFER ERROR] Framebuffer is not complete! Kaput!!!!");
-	}
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	FramebufferState fboState;
+
+	initializeFramebuffer(fboState, appState);
 	
 	initializeFrameTiming(appState);
 
@@ -201,7 +173,7 @@ int main()
 		std::string promptText;
 
 		if (appState.framebufferResized)
-			resizeFramebufferAttachments(framebuffer, textureColorBuffer, RBO, appState);
+			resizeFramebufferAttachments(fboState, appState);
 
 		processInput(window, gameState);
 
@@ -218,9 +190,9 @@ int main()
 		if (!gameState.roomTransition.transitioning)
 			updateRoomCamera(gameState);
 
-		renderSceneToFBO(framebuffer, shader, playerModel, appState, gameState);
+		renderSceneToFBO(fboState, shader, playerModel, appState, gameState);
 
-		renderScreen(quadVAO, screenShader, textureColorBuffer, appState, gameState);
+		renderScreen(quadVAO, screenShader, fboState, appState, gameState);
 
 		drawInteractionPrompt(
 			promptText,
@@ -241,10 +213,9 @@ int main()
 		glfwPollEvents();
 	}
 	
+	destroyFramebuffer(fboState);
 	glDeleteVertexArrays(1, &quadVAO);
 	glDeleteBuffers(1, &quadVBO);
-	glDeleteRenderbuffers(1, &RBO);
-    glDeleteFramebuffers(1, &framebuffer);
 		
 	glfwTerminate();
     return 0;

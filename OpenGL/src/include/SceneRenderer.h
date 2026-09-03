@@ -5,9 +5,10 @@ class Model;
 
 struct AppState;
 struct GameState;
+struct FramebufferState;
 
 void renderSceneToFBO(
-							unsigned int framebuffer,
+							const FramebufferState& fboState,
 							Shader& shader,
 							Model& playerModel,
 							const AppState& appState,

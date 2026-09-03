@@ -1,4 +1,5 @@
 #include "include/ScreenRenderer.h"
+#include "include/FramebufferSystem.h"
 
 #include <glad/glad.h>
 
@@ -11,7 +12,7 @@
 void renderScreen(
 							unsigned int quadVAO, 
 							Shader& screenShader,
-							unsigned int textureColorBuffer, 
+							const FramebufferState& fboState, 
 							const AppState& appState,
 							const GameState& gameState
 ) {
@@ -38,7 +39,7 @@ void renderScreen(
 	screenShader.setFloat("brightness", 0.0f);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
+	glBindTexture(GL_TEXTURE_2D, fboState.textureColorbuffer);
 
 	glBindVertexArray(quadVAO);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
