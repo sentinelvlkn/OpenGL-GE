@@ -1,4 +1,3 @@
-
 #include "include/AppContext.h"
 #include "include/AppState.h"
 #include "include/GameState.h"

@@ -1,10 +1,3 @@
-/*
- * FileSystem.h
- *
- *  Created on: Jan 10, 2026
- *      Author: volokin
- */
-
 #ifndef SRC_FILESYSTEM_H_
 #define SRC_FILESYSTEM_H_
 
