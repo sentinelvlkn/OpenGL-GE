@@ -1,5 +1,5 @@
 #include "include/DebugTerminal.h"
-#include "include/Appstate.h"
+#include "include/AppState.h"
 #include "include/ShaderSystem.h"
 #include "include/Shader.h"
 #include "include/UiSystem.h"
