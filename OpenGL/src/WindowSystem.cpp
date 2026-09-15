@@ -92,12 +92,12 @@ bool initializeWindow(
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
 	windowState.handle = glfwCreateWindow(
-        width,
-        height,
-        title,
-        nullptr,
-        nullptr
-    );
+        	width,
+	        height,
+        	title,
+	        nullptr,
+	        nullptr
+    	);
 
 	if (windowState.handle == nullptr) {
 		std::cout << "Failed to create GLFW window" << std::endl;
@@ -114,18 +114,29 @@ bool initializeWindow(
 	glfwSetFramebufferSizeCallback(windowState.handle, framebuffer_size_callback);
 	glfwGetFramebufferSize(windowState.handle, &appState.framebufferWidth, &appState.framebufferHeight);
 
-	appState.lastMouseX = appState.framebufferWidth * 0.5f;
-	appState.lastMouseY = appState.framebufferHeight * 0.5f;
+	int windowW = 0;
+	int windowH = 0;
+
+	glfwGetWindowSize(
+		windowState.handle,
+		&windowW,
+		&windowH
+	);
+
+	appState.lastMouseX = windowW * 0.5f;
+	appState.lastMouseY = windowH * 0.5f;
 	appState.firstMouse = true;
 
 	if (enableMouseLook) {
+
 		glfwSetCursorPosCallback(windowState.handle, mouse_callback);
 		glfwSetScrollCallback(windowState.handle, scroll_callback);
+		glfwSetInputMode(windowState.handle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+	} else {
+		glfwSetInputMode(windowState.handle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 	}
-
 	
-	glfwSetInputMode(windowState.handle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
 	bool gladLoaded = gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress));
 
 	if (!gladLoaded) {
