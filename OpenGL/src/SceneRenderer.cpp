@@ -277,10 +277,10 @@ void renderSceneToFBO(
 	float aspect = static_cast<float>(appState.framebufferWidth) /
 				   static_cast<float>(appState.framebufferHeight);
 
-	glm::mat4 projection = glm::perspective(glm::radians(gameState.camera.Zoom),
+	glm::mat4 projection = glm::perspective(glm::radians(gameState.camera.fovDegrees),
 											aspect, 0.1f, 100.0f);
 
-	glm::mat4 view = gameState.camera.getViewMatrix();
+	glm::mat4 view = gameState.camera.viewMatrix();
 
 	shader.setUniform("projection", projection);
 	shader.setUniform("view", view);

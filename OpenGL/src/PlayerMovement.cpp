@@ -46,22 +46,24 @@ void updatePlayerMovement(GLFWwindow *window, Player &player,
 	// clamp dt to reduce tunneling on frame spikes
 	deltaTime = glm::min(deltaTime, 1.0f / 30.0f);
 
-	// camera-relative basis (flattened)
-	glm::vec3 camForward = camera.Front;
+	// camera-relative basis (flattened onto XZ)
+	glm::vec3 camForward = camera.target - camera.position;
 	camForward.y = 0.0f;
+
 	if (glm::length(camForward) > 0.0001f)
 		camForward = glm::normalize(camForward);
 	else
-		camForward = glm::vec3(0, 0, -1);
+		camForward = glm::vec3(0.0f, 0.0f, -1.0f);
 
-	glm::vec3 camRight = camera.Right;
-	camRight.y = 0.0f;
+	glm::vec3 camRight = glm::cross(camForward, glm::vec3(0.0f, 1.0f, 0.0f));
+
 	if (glm::length(camRight) > 0.0001f)
 		camRight = glm::normalize(camRight);
 	else
-		camRight = glm::vec3(1, 0, 0);
+		camRight = glm::vec3(1.0f, 0.0f, 0.0f);
 
 	glm::vec3 moveDir = getMoveDirInput(window, camForward, camRight);
+
 	if (glm::length(moveDir) < 0.0001f)
 		return;
 
@@ -69,7 +71,7 @@ void updatePlayerMovement(GLFWwindow *window, Player &player,
 
 	// substeps
 	const int steps = 4;
-	const float dt = deltaTime / (float)steps;
+	const float dt = deltaTime / static_cast<float>(steps);
 
 	static int lastHit = -1;
 
@@ -80,8 +82,7 @@ void updatePlayerMovement(GLFWwindow *window, Player &player,
 		int hitIndex = -1;
 
 		for (int i = 0; i < (int)room.colliders.size(); ++i) {
-			if (circleAABBIntersectXZ(nextPos, playerRadius,
-									  room.colliders[i])) {
+			if (circleAABBIntersectXZ(nextPos, playerRadius, room.colliders[i])) {
 				blocked = true;
 				hitIndex = i;
 				break;
