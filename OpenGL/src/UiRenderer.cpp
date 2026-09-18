@@ -81,9 +81,9 @@ void UiRenderer::drawRectangle( Shader &shader,
 		static_cast<float>(screenHeight)
 	);
 
-	shader.setMat4("projection", projection);
-	shader.setVec3("rectangleColor", color);
-	shader.setFloat("rectangleAlpha", alpha);
+	shader.setUniform("projection", projection);
+	shader.setUniform("rectangleColor", color);
+	shader.setUniform("rectangleAlpha", alpha);
 
 	glBindVertexArray(rectangleVAO);
 

@@ -128,7 +128,6 @@ bool initializeWindow(
 	appState.firstMouse = true;
 
 	if (enableMouseLook) {
-
 		glfwSetCursorPosCallback(windowState.handle, mouse_callback);
 		glfwSetScrollCallback(windowState.handle, scroll_callback);
 		glfwSetInputMode(windowState.handle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
