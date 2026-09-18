@@ -1,4 +1,5 @@
 #pragma once
+
 #include <vector>
 #include <string>
 #include <glm/glm.hpp>
@@ -12,10 +13,21 @@
 
 using json = nlohmann::json;
 
+enum class CameraTargetMode{
+	Fixed,
+	FollowPlayer
+};
+
 struct RoomCamera {
 	glm::vec3 position;
 	glm::vec3 target;
+
 	float fov = 45.0f;
+
+	CameraTargetMode targetMode = CameraTargetMode::Fixed;
+
+	//for when target mode is to follow player
+	glm::vec3 targetOffset = glm::vec3(0.0f, 1.0f, 0.0f);
 
 	glm::vec3 aabbMin;
 	glm::vec3 aabbMax;
@@ -61,12 +73,6 @@ inline void roomCameraSwitch(Room &room, const glm::vec3 &playerPos) {
 			return;
 		}
 	}
-}
-
-inline void applyRoomCamera(const Room& room, Camera& camera){
-	const RoomCamera& shot = room.cameras[room.activeCamera];
-	camera.setView(shot.position, shot.target);
-	camera.fovDegrees = shot.fov;
 }
 
 glm::vec3 convertBlenderCoords(const glm::vec3 &b);

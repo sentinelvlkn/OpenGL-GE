@@ -48,8 +48,8 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 		glm::vec3 minB = readVec3(jc.at("zoneMin"), "zoneMin");
 		glm::vec3 maxB = readVec3(jc.at("zoneMax"), "zoneMax");
 		convertBlenderAABB(minB, maxB, cam.aabbMin, cam.aabbMax);
-        
-        {
+		       
+        	{
 			std::ostringstream ss;
 
 			ss << "[CAMERA] Converted zone (Engine): min(" << cam.aabbMin.x
@@ -62,7 +62,7 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 
 		cam.fov = jc.value("fov", 45.0f);
         
-        {
+        	{
 			std::ostringstream ss;
 
 			ss << "[CAMERA] JSON zoneMin (Blender): " << minB.x << ", "
@@ -71,7 +71,19 @@ Room loadRoomFromJson(const std::string &jsonPath) {
 
 			DebugLog::log(ss.str());
 		}
+		
+		std::string targetMode = jc.value("targetMode", "fixed");
 
+		if (targetMode == "followPlayer")
+			cam.targetMode = CameraTargetMode::FollowPlayer;
+		else
+			cam.targetMode = CameraTargetMode::Fixed;
+
+		if (jc.contains("targetOffset")) {
+			cam.targetOffset = convertBlenderCoords(
+				readVec3(jc.at("targetOffset"), "targetOffset")
+			);
+		}
 
 		room.cameras.push_back(cam);
 	}
