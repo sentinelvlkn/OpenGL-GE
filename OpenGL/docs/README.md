@@ -23,7 +23,7 @@ The project is organized around a set of shared state objects and focused system
 
 ## License
 
-Original code in this project is licensed under the ... License.
+Original code in this project is licensed under the MIT License.
 
 Third-party components remain under their respective licenses.
 
