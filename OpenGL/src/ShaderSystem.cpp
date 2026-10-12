@@ -27,11 +27,11 @@ ShaderState::ShaderState() :
 
 void initializeShaders(ShaderState& shaders) {
 	shaders.screenShader.use();
-	shaders.screenShader.setFloat("vignetteStrength", 0.5f);
-	shaders.screenShader.setFloat("grainStrength", 0.02f);
-	shaders.screenShader.setFloat("saturation", 0.7f);
-	shaders.screenShader.setFloat("contrast", 1.2f);
+	shaders.screenShader.setUniform("vignetteStrength", 0.5f);
+	shaders.screenShader.setUniform("grainStrength", 0.02f);
+	shaders.screenShader.setUniform("saturation", 0.7f);
+	shaders.screenShader.setUniform("contrast", 1.2f);
 
 	shaders.uiShader.use();
-	shaders.uiShader.setInt("uiTexture", 0);
+	shaders.uiShader.setUniform("uiTexture", 0);
 }

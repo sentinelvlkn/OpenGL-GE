@@ -4,92 +4,67 @@
 #include <string>
 
 #include "include/AssetCache.h"
+#include "include/CameraSystem.h"
+#include "include/FadeSystem.h"
 #include "include/DebugLog.h"
 #include "include/FileSystem.h"
 #include "include/GameState.h"
-
-void beginRoomTransition(	RoomTransitionState &transitionState,
-							const std::string &targetRoomJson,
-							const glm::vec3 &targetSpawn, 
-							FadeState &fadeState) {
-
-	transitionState.transitioning = true;
-	transitionState.pendingRoomJson = targetRoomJson;
-	transitionState.pendingSpawn = targetSpawn;
-
-	beginFadeToBlack(fadeState);
-}
-
-void updateRoomTransition(RoomTransitionState &transitionState,
-						  FadeState &fadeState, Room &currentRoom,
-						  Model *&currentRoomModel, Player &player,
-						  Camera &camera) {
-
-	if (!transitionState.transitioning)
-		return;
-
-	if (!isFullyBlack(fadeState))
-		return;
-
-	try {
-		
-		std::string roomPath = FileSystem::pathFromRoot(
-			transitionState.pendingRoomJson
-		);
-
-		Room loadedRoom = loadRoomFromJson(roomPath.c_str());
-
-		currentRoom = loadedRoom;
-		currentRoomModel = &getRoomModel(currentRoom);
-
-		player.position = transitionState.pendingSpawn;
-
-		roomCameraSwitch(currentRoom, player.position);
-		applyRoomCamera(currentRoom, camera);
-
-		DebugLog::log("[ROOM] Loaded: " + currentRoom.name);
-
-		beginFadeFromBlack(fadeState);
-
-		transitionState.transitioning = false;
-		transitionState.pendingRoomJson.clear();
-	} 
-	catch (const std::exception &e) {
-		DebugLog::log(std::string("[ROOM ERROR] Failed to load room: ") +
-					  e.what()
-		);
-		beginFadeFromBlack(fadeState);
-
-		transitionState.transitioning = false;
-		transitionState.pendingRoomJson.clear();
-	}
-}
-
+#include "include/Room.h"
 
 void beginRoomTransition(
 							GameState& gameState,
 							const std::string& targetRoomJson,
 							const glm::vec3& targetSpawn
 ) {
-    beginRoomTransition(
-        gameState.roomTransition,
-        targetRoomJson,
-        targetSpawn,
-        gameState.fade
-    );
+	gameState.roomTransition.transitioning = true;
+	gameState.roomTransition.pendingRoomJson = targetRoomJson;
+	gameState.roomTransition.pendingSpawn = targetSpawn;
+	
+	beginFadeToBlack(gameState.fade);
 }
 
 
 void updateRoomTransition(GameState& gameState)
 {
-    updateRoomTransition(
-        gameState.roomTransition,
-        gameState.fade,
-        gameState.room,
-        gameState.roomModel,
-        gameState.player,
-        gameState.camera
-    );
+	if (!gameState.roomTransition.transitioning)
+		return;
+
+	if (!isFullyBlack(gameState.fade))
+		return;
+	
+	try {
+		std::string roomPath = FileSystem::pathFromRoot(
+			gameState.roomTransition.pendingRoomJson
+		);
+
+		gameState.room = loadRoomFromJson(roomPath);
+
+		gameState.roomModel = &getRoomModel(gameState.room);
+
+		gameState.player.position = gameState.roomTransition.pendingSpawn;
+
+		updateRoomCamera(gameState);
+
+		DebugLog::log(
+			"[ROOM] Loaded: " + gameState.room.name
+		);
+
+		beginFadeFromBlack(gameState.fade);
+
+		gameState.roomTransition.transitioning = false;
+		gameState.roomTransition.pendingRoomJson.clear();
+
+	} catch(const std::exception& e) {
+
+		DebugLog::log(
+			std::string("[ROOM ERROR] Failed to load room: ") + e.what()
+		);
+
+		beginFadeFromBlack(gameState.fade);
+
+		gameState.roomTransition.transitioning = false;
+		gameState.roomTransition.pendingRoomJson.clear();
+	}
 }
 
 

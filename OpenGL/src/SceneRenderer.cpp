@@ -93,13 +93,13 @@ static void uploadRoomLights(Shader &shader, const Room &room,
 				std::string base =
 					"spotLights[" + std::to_string(numSpotLights) + "]";
 
-				shader.setVec3(base + ".position", light.position);
-				shader.setVec3(base + ".direction", direction);
-				shader.setVec3(base + ".color", light.color);
-				shader.setFloat(base + ".intensity", intensity);
-				shader.setFloat(base + ".radius", light.radius);
-				shader.setFloat(base + ".innerCutoff", light.innerCutoff);
-				shader.setFloat(base + ".outerCutoff", light.outerCutoff);
+				shader.setUniform(base + ".position", light.position);
+				shader.setUniform(base + ".direction", direction);
+				shader.setUniform(base + ".color", light.color);
+				shader.setUniform(base + ".intensity", intensity);
+				shader.setUniform(base + ".radius", light.radius);
+				shader.setUniform(base + ".innerCutoff", light.innerCutoff);
+				shader.setUniform(base + ".outerCutoff", light.outerCutoff);
 
 				numSpotLights++;
 
@@ -113,10 +113,10 @@ static void uploadRoomLights(Shader &shader, const Room &room,
 				}
 				std::string base =
 					"pointLights[" + std::to_string(numPointLights) + "]";
-				shader.setVec3(base + ".position", light.position);
-				shader.setVec3(base + ".color", light.color);
-				shader.setFloat(base + ".intensity", intensity);
-				shader.setFloat(base + ".radius", light.radius);
+				shader.setUniform(base + ".position", light.position);
+				shader.setUniform(base + ".color", light.color);
+				shader.setUniform(base + ".intensity", intensity);
+				shader.setUniform(base + ".radius", light.radius);
 
 				numPointLights++;
 			}
@@ -128,15 +128,15 @@ static void uploadRoomLights(Shader &shader, const Room &room,
 
 		std::string base = "pointLights[0]";
 
-		shader.setVec3(base + ".position",
+		shader.setUniform(base + ".position",
 					   player.position + glm::vec3(0.0f, 2.0f, 0.0f));
-		shader.setVec3(base + ".color", glm::vec3(1.0f, 0.75f, 0.45f));
-		shader.setFloat(base + ".intensity", 3.0f);
-		shader.setFloat(base + ".radius", 10.0f);
+		shader.setUniform(base + ".color", glm::vec3(1.0f, 0.75f, 0.45f));
+		shader.setUniform(base + ".intensity", 3.0f);
+		shader.setUniform(base + ".radius", 10.0f);
 	}
 
-	shader.setInt("numPointLights", numPointLights);
-	shader.setInt("numSpotLights", numSpotLights);
+	shader.setUniform("numPointLights", numPointLights);
+	shader.setUniform("numSpotLights", numSpotLights);
 
 	if (shouldPrintLightDebug) {
 		std::ostringstream ss;
@@ -152,19 +152,19 @@ static void uploadRoomLights(Shader &shader, const Room &room,
 
 static void drawRoom(Shader &shader, Model &roomModel) {
 
-	shader.setVec3("emissiveColor", glm::vec3(0.0f));
-	shader.setFloat("emissiveStrength", 0.0f);
+	shader.setUniform("emissiveColor", glm::vec3(0.0f));
+	shader.setUniform("emissiveStrength", 0.0f);
 
 	glm::mat4 model = glm::mat4(1.0f);
 
-	shader.setMat4("model", model);
+	shader.setUniform("model", model);
 	roomModel.Draw(shader);
 }
 
 static void drawProps(Shader &shader, const Room &room, float time) {
 
 	glActiveTexture(GL_TEXTURE0);
-	shader.setInt("texture_diffuse1", 0);
+	shader.setUniform("texture_diffuse1", 0);
 
 	for (const Prop &prop : room.props) {
 
@@ -202,33 +202,33 @@ static void drawProps(Shader &shader, const Room &room, float time) {
 
 		propModelMatrix = glm::scale(propModelMatrix, prop.scale);
 
-		shader.setMat4("model", propModelMatrix);
+		shader.setUniform("model", propModelMatrix);
 
 		if (prop.glow) {
-			shader.setVec3("emissiveColor", prop.glowColor);
-			shader.setFloat("emissiveStrength", prop.glowStrength);
+			shader.setUniform("emissiveColor", prop.glowColor);
+			shader.setUniform("emissiveStrength", prop.glowStrength);
 		} else {
-			shader.setVec3("emissiveColor", glm::vec3(0.0f));
-			shader.setFloat("emissiveStrength", 0.0f);
+			shader.setUniform("emissiveColor", glm::vec3(0.0f));
+			shader.setUniform("emissiveStrength", 0.0f);
 		}
 
 		propModel.Draw(shader);
 	}
 
-	shader.setVec3("emissiveColor", glm::vec3(0.0f));
-	shader.setFloat("emissiveStrength", 0.0f);
+	shader.setUniform("emissiveColor", glm::vec3(0.0f));
+	shader.setUniform("emissiveStrength", 0.0f);
 }
 
 static void drawPlayer(Shader &shader, Model &playerModel,
 					   const Player &player) {
 
-	shader.setVec3("emissiveColor", glm::vec3(0.0f));
-	shader.setFloat("emissiveStrength", 0.0f);
+	shader.setUniform("emissiveColor", glm::vec3(0.0f));
+	shader.setUniform("emissiveStrength", 0.0f);
 
 	glm::mat4 playerMo = glm::mat4(1.0f);
 	playerMo = glm::translate(playerMo, player.position);
 
-	shader.setMat4("model", playerMo);
+	shader.setUniform("model", playerMo);
 	playerModel.Draw(shader);
 }
 
@@ -267,9 +267,9 @@ void renderSceneToFBO(
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, 0);
-	shader.setInt("texture_diffuse1", 0);
+	shader.setUniform("texture_diffuse1", 0);
 
-	shader.setVec3("ambientColor", gameState.room.ambientColor);
+	shader.setUniform("ambientColor", gameState.room.ambientColor);
 
 	uploadRoomLights(shader, gameState.room, gameState.player, time,
 					 gameState.lightingDebug);
@@ -277,16 +277,16 @@ void renderSceneToFBO(
 	float aspect = static_cast<float>(appState.framebufferWidth) /
 				   static_cast<float>(appState.framebufferHeight);
 
-	glm::mat4 projection = glm::perspective(glm::radians(gameState.camera.Zoom),
+	glm::mat4 projection = glm::perspective(glm::radians(gameState.camera.fovDegrees),
 											aspect, 0.1f, 100.0f);
 
-	glm::mat4 view = gameState.camera.getViewMatrix();
+	glm::mat4 view = gameState.camera.viewMatrix();
 
-	shader.setMat4("projection", projection);
-	shader.setMat4("view", view);
+	shader.setUniform("projection", projection);
+	shader.setUniform("view", view);
 
 	glActiveTexture(GL_TEXTURE0);
-	shader.setInt("texture_diffuse1", 0);
+	shader.setUniform("texture_diffuse1", 0);
 
 	drawRoom(shader, *gameState.roomModel);
 	drawProps(shader, gameState.room, time);

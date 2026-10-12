@@ -1,4 +1,5 @@
 #pragma once
+
 #include <vector>
 #include <string>
 #include <glm/glm.hpp>
@@ -12,10 +13,21 @@
 
 using json = nlohmann::json;
 
+enum class CameraTargetMode{
+	Fixed,
+	FollowPlayer
+};
+
 struct RoomCamera {
 	glm::vec3 position;
 	glm::vec3 target;
+
 	float fov = 45.0f;
+
+	CameraTargetMode targetMode = CameraTargetMode::Fixed;
+
+	//for when target mode is to follow player
+	glm::vec3 targetOffset = glm::vec3(0.0f, 1.0f, 0.0f);
 
 	glm::vec3 aabbMin;
 	glm::vec3 aabbMax;
@@ -61,37 +73,6 @@ inline void roomCameraSwitch(Room &room, const glm::vec3 &playerPos) {
 			return;
 		}
 	}
-}
-
-//applies the active camera after setting the index in roomCameraSwitch
-//inline void applyRoomCamera(const Room& room, Camera& camera) {
-//	const RoomCamera &shot = room.cameras[room.activeCamera];
-
-	//camera.setLookAt(shot.position, shot.target); make it snap immediately
-	
-	//the code down does blending and makes it more fancy lol
-//	glm::vec3 targetPos = shot.position;
-//	glm::vec3 targetFront = glm::normalize(shot.target - shot.position);
-
-//	 const float blend = 0.08f;
-
-//	camera.Position = glm::mix(camera.Position, targetPos, blend);
-//	camera.Front = glm::normalize(glm::mix(camera.Front, targetFront, blend));
-
-//	camera.Right = glm::normalize(glm::cross(camera.Front, camera.WorldUp));
-//	camera.Up = glm::normalize(glm::cross(camera.Right, camera.Front));
-
-//	camera.Zoom = glm::mix(camera.Zoom, shot.fov, blend);
-
-	/*std::cout << "Cam pos " << shot.position.x << "," << shot.position.y << ","
-			  << shot.position.z << " target " << shot.target.x << ","
-			  << shot.target.y << "," << shot.target.z << "\n";*/
-//}
-
-inline void applyRoomCamera(const Room& room, Camera& camera){
-	const RoomCamera& shot = room.cameras[room.activeCamera];
-	camera.setLookAt(shot.position, shot.target);
-	camera.Zoom = shot.fov;
 }
 
 glm::vec3 convertBlenderCoords(const glm::vec3 &b);

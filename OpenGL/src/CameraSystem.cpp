@@ -2,10 +2,26 @@
 
 #include "include/GameState.h"
 #include "include/Room.h"
-#include "include/Player.h"
-#include "include/Camera.h"
 
 void updateRoomCamera(GameState &gameState) {
-	roomCameraSwitch(gameState.room, gameState.player.position);
-	applyRoomCamera(gameState.room, gameState.camera);
+	
+	Room& room = gameState.room;
+
+	if (room.cameras.empty())
+		return;
+
+	roomCameraSwitch(room, gameState.player.position);
+
+	const RoomCamera& shot = room.cameras[room.activeCamera];
+
+	glm::vec3 target = shot.target;
+
+	if (shot.targetMode == CameraTargetMode::FollowPlayer)
+		target = gameState.player.position + shot.targetOffset;
+
+	gameState.camera.setView(shot.position, target);
+
+	gameState.camera.setFov(shot.fov);
+
 }
+

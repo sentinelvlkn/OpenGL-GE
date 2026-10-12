@@ -29,6 +29,7 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
 	context->appState->framebufferResized = true;
 }
 
+/*
 void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
 	AppContext *context =
 		static_cast<AppContext *>(glfwGetWindowUserPointer(window));
@@ -66,6 +67,7 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
 
 	context->gameState->camera.processMouseScroll(static_cast<float>(yoffset));
 }
+*/
 
 }
 
@@ -127,15 +129,7 @@ bool initializeWindow(
 	appState.lastMouseY = windowH * 0.5f;
 	appState.firstMouse = true;
 
-	if (enableMouseLook) {
-
-		glfwSetCursorPosCallback(windowState.handle, mouse_callback);
-		glfwSetScrollCallback(windowState.handle, scroll_callback);
-		glfwSetInputMode(windowState.handle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-	} else {
-		glfwSetInputMode(windowState.handle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-	}
+	glfwSetInputMode(windowState.handle, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 	
 	bool gladLoaded = gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress));
 

@@ -36,7 +36,6 @@ TextRenderer::TextRenderer() {
 TextRenderer::~TextRenderer() {
 	for (auto &pair : characters)
 		glDeleteTextures(1, &pair.second.textureID);
-	
 
 	if (VBO != 0)
 		glDeleteBuffers(1, &VBO);
@@ -130,14 +129,11 @@ void TextRenderer::renderText(Shader &shader, const std::string &text, float x,
 
 	shader.use();
 
-	glm::mat4 projection = glm::ortho(	0.0f, 
-										static_cast<float>(screenWidth),
-										0.0f, 
-										static_cast<float>(screenHeight));
+	glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(screenWidth), 0.0f, static_cast<float>(screenHeight));
 
-	shader.setMat4("projection", projection);
-	shader.setVec3("textColor", color);
-	shader.setInt("text", 0);
+	shader.setUniform("projection", projection);
+	shader.setUniform("textColor", color);
+	shader.setUniform("text", 0);
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindVertexArray(VAO);

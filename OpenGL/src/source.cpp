@@ -31,84 +31,92 @@ int main()
 	WindowState windowState;
 
 	if (!initializeWindow(windowState, appState, gameState, appContext, INITIAL_WIDTH, INITIAL_HEIGHT, "OPENGL")) {
-        return -1;
-    }
-
-	ShaderState shaders;
-	initializeShaders(shaders);
-
-	initializeGameState(gameState, "src/models/test_room/test_room.json");
-
-	ModelState modelState;
-	initializeModels(modelState);
-
-	QuadMeshState quadMeshState;
-	initializeScreenQuad(quadMeshState);
-
-	UiState uiState;
-	if (!initializeUi(uiState))
-		DebugLog::log("[BOOT ERROR] UI initialization failed.");
-
-	FramebufferState fboState;
-	if (!initializeFramebuffer(fboState, appState)) {
-		destroyScreenQuad(quadMeshState);
-		shutdownWindow(windowState);
-		return -1;
+        	return -1;
 	}
-	
-	initializeFrameTiming(appState);
 
-	//main game loop
-	while (!shouldWindowClose(windowState)) {
+	int exitCode = 0;
 
-		updateFrameTiming(appState);
+	{
+		ShaderState shaders;
+		initializeShaders(shaders);
 
-		std::string promptText;
+		initializeGameState(gameState, "src/models/test_room/test_room.json");
 
-		if (appState.framebufferResized) {
-			resizeFramebufferAttachments(fboState, appState);
-		}
+		ModelState modelState;
+		initializeModels(modelState);
 
-		processInput(windowState.handle, gameState);
+		QuadMeshState quadMeshState;
+		initializeScreenQuad(quadMeshState);
 
-		updateLightningDebugInput(windowState.handle, appState, gameState);
+		UiState uiState;
+		if (!initializeUi(uiState))
+			DebugLog::log("[BOOT ERROR] UI initialization failed.");
 
-		updateDebugInput(windowState.handle, appState, gameState);
+		FramebufferState fboState;
+		if (!initializeFramebuffer(fboState, appState)) {
+			destroyFramebuffer(fboState);
+			destroyScreenQuad(quadMeshState);
 
-		updateFade(gameState, appState);
+			exitCode = -1;
 
-		updateRoomTransition(gameState);
+		} else {
 
-		promptText = updateGameplay(windowState.handle, appState, gameState);
+			initializeFrameTiming(appState);
 
-		if (!gameState.roomTransition.transitioning)
-			updateRoomCamera(gameState);
+			//main game loop
+			while (!shouldWindowClose(windowState)) {
 
-		renderSceneToFBO(fboState, shaders, modelState, appState, gameState);
+				updateFrameTiming(appState);
 
-		renderScreen(quadMeshState, shaders, fboState, appState, gameState);
-
-		drawInteractionPrompt(
-			promptText,
-			uiState,
-			shaders,
-			appState,
-			gameState
-		);
-
-		drawNoteOverlay(gameState, shaders, quadMeshState);
-
-		drawDebugTerminal(uiState, shaders, appState);
-
-		swapWindowBuffers(windowState);
-		pollWindowEvents();
-	}
-	
-	destroyFramebuffer(fboState);
-	destroyScreenQuad(quadMeshState);
+				std::string promptText;
 		
+				if (appState.framebufferResized) {
+					resizeFramebufferAttachments(fboState, appState);
+				}
+
+				processInput(windowState.handle, gameState);
+
+				updateLightningDebugInput(windowState.handle, appState, gameState);
+
+				updateDebugInput(windowState.handle, appState, gameState);
+
+				updateFade(gameState, appState);
+
+				updateRoomTransition(gameState);
+
+				promptText = updateGameplay(windowState.handle, appState, gameState);
+
+				if (!gameState.roomTransition.transitioning)
+					updateRoomCamera(gameState);
+
+				renderSceneToFBO(fboState, shaders, modelState, appState, gameState);
+
+				renderScreen(quadMeshState, shaders, fboState, appState, gameState);
+
+				drawInteractionPrompt(
+					promptText,
+					uiState,
+					shaders,
+					appState,
+					gameState
+				);
+
+				drawNoteOverlay(gameState, shaders, quadMeshState);
+
+				drawDebugTerminal(uiState, shaders, appState);
+
+				swapWindowBuffers(windowState);
+				pollWindowEvents();
+			}
+		
+			destroyFramebuffer(fboState);
+			destroyScreenQuad(quadMeshState);
+		}
+	}
+	
 	shutdownWindow(windowState);
-	return 0;
+
+	return exitCode;
 }	
 
 

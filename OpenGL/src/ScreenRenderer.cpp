@@ -31,16 +31,16 @@ void renderScreen(
 
 	screenShader.use();
 
-	screenShader.setInt("screenTexture", 0);
+	screenShader.setUniform("screenTexture", 0);
 
-	screenShader.setFloat("fade", gameState.fade.value);
-	screenShader.setFloat("time", appState.timing.currentTime);
+	screenShader.setUniform("fade", gameState.fade.value);
+	screenShader.setUniform("time", appState.timing.currentTime);
 
-	screenShader.setFloat("vignetteStrength", 0.0f);
-	screenShader.setFloat("grainStrength", 0.0f);
-	screenShader.setFloat("saturation", 1.0f);
-	screenShader.setFloat("contrast", 1.0f);
-	screenShader.setFloat("brightness", 0.0f);
+	screenShader.setUniform("vignetteStrength", 0.0f);
+	screenShader.setUniform("grainStrength", 0.0f);
+	screenShader.setUniform("saturation", 1.0f);
+	screenShader.setUniform("contrast", 1.0f);
+	screenShader.setUniform("brightness", 0.0f);
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, fboState.textureColorbuffer);

@@ -18,12 +18,12 @@ The project is organized around a set of shared state objects and focused system
 - **MAIN_LOOP_FLOW.md** - startup, per-frame and shutdown order
 - **CODE_STRUCTURE.md** - what each source file/system is responsible for
 - **FUNCTION_REFERENCE.md** - lookup reference for important public functions
-- **ROOM_AND_BLENDER_PPELINE.md** - room JSON, Blender data and room authoring pipeline
+- **ROOM_AND_BLENDER_PIPELINE.md** - room JSON, Blender data and room authoring pipeline
 - **BUILD_AND_DEPENDENCES.md** - dependences, build steps and common issues during build
 
 ## License
 
-Original code in this project is licensed under the ... License.
+Original code in this project is licensed under the MIT License.
 
 Third-party components remain under their respective licenses.
 

@@ -19,25 +19,9 @@ struct RoomTransitionState {
 };
 
 void beginRoomTransition(
-							RoomTransitionState& transitionState,
-							const std::string& targetRoomJson,
-							const glm::vec3& targetSpawn,
-							FadeState& fadestate
-);
-
-void beginRoomTransition(
 							GameState& gameState,
 							const std::string& targetRoomJson,
 							const glm::vec3& targetSpawn
-);
-
-void updateRoomTransition(
-							RoomTransitionState& transitionState,
-							FadeState& fadeState,
-							Room& currentRoom,
-							Model*& currentRoomModel,
-							Player& player,
-							Camera& camera
 );
 
 void updateRoomTransition(GameState &gameState);
